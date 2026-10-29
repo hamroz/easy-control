@@ -12,6 +12,13 @@ private func linear(_ pose: PoseClass, from a: SIMD2<Float>, to b: SIMD2<Float>,
     }
 }
 
+/// Holds the last position of `samples` still for `seconds` (a stroke that ends with the hand stopping).
+private func thenHold(_ samples: [Sample], for seconds: Double = 0.15) -> [Sample] {
+    guard let last = samples.last else { return samples }
+    let n = Int((seconds * 30).rounded())
+    return samples + (1...n).map { (last.t + Double($0) / 30, last.pose, last.center) }
+}
+
 private func runSwipe(_ samples: [Sample]) -> [GestureEvent] {
     var r = SwipeRecognizer(config: .default)
     return samples.compactMap { r.update(pose: $0.pose, palmCenter: $0.center, at: $0.t) }
@@ -49,7 +56,7 @@ private func runSwipe(_ samples: [Sample]) -> [GestureEvent] {
 }
 
 @Test func fastLeftSwipeFires() {
-    let events = runSwipe(linear(.openPalm, from: [0.7, 0.5], to: [0.45, 0.5], over: 0.2, start: 0))
+    let events = runSwipe(thenHold(linear(.openPalm, from: [0.7, 0.5], to: [0.45, 0.5], over: 0.2, start: 0)))
     #expect(events == [.discrete(.swipeLeft)])
 }
 
@@ -62,12 +69,12 @@ private func runSwipe(_ samples: [Sample]) -> [GestureEvent] {
 }
 
 @Test func upSwipeIsMissionControlDirection() {
-    #expect(runSwipe(linear(.openPalm, from: [0.5, 0.7], to: [0.5, 0.45], over: 0.2, start: 0)) == [.discrete(.swipeUp)])
+    #expect(runSwipe(thenHold(linear(.openPalm, from: [0.5, 0.7], to: [0.5, 0.45], over: 0.2, start: 0))) == [.discrete(.swipeUp)])
 }
 
 @Test func cooldownPreventsDoubleFire() {
-    let first = linear(.openPalm, from: [0.7, 0.5], to: [0.45, 0.5], over: 0.2, start: 0)
-    let second = linear(.openPalm, from: [0.45, 0.5], to: [0.2, 0.5], over: 0.2, start: 0.2 + 1.0 / 30)
+    let first = thenHold(linear(.openPalm, from: [0.7, 0.5], to: [0.45, 0.5], over: 0.2, start: 0), for: 0.1)
+    let second = thenHold(linear(.openPalm, from: [0.45, 0.5], to: [0.2, 0.5], over: 0.2, start: first.last!.t + 1.0 / 30))
     #expect(runSwipe(first + second) == [.discrete(.swipeLeft)])
 }
 
@@ -76,4 +83,28 @@ private func runSwipe(_ samples: [Sample]) -> [GestureEvent] {
     samples.append((9.0 / 30 + 0.5, .openPalm, [0.3, 0.5]))
     samples.append((9.0 / 30 + 0.5 + 1.0 / 30, .openPalm, [0.3, 0.5]))
     #expect(runSwipe(samples).isEmpty)
+}
+
+@Test func handDropDoesNotSwipe() {
+    // Engaged user lowers the open hand out of the frame.
+    var samples = linear(.openPalm, from: [0.5, 0.5], to: [0.5, 0.97], over: 0.25, start: 0)
+    samples.append((samples.last!.t + 1.0 / 30, .none, nil))
+    #expect(runSwipe(samples).isEmpty)
+}
+
+@Test func strokeEndingAtFrameEdgeDoesNotSwipe() {
+    #expect(runSwipe(thenHold(linear(.openPalm, from: [0.5, 0.55], to: [0.5, 0.95], over: 0.25, start: 0))).isEmpty)
+}
+
+@Test func strokeThatNeverStopsDoesNotSwipe() {
+    // Hand keeps moving (e.g. gesturing while talking) and the pose ends without the stroke settling.
+    var samples = linear(.openPalm, from: [0.8, 0.5], to: [0.2, 0.5], over: 0.5, start: 0)
+    samples.append((samples.last!.t + 1.0 / 30, .fist, [0.18, 0.5]))
+    #expect(runSwipe(samples).isEmpty)
+}
+
+@Test func returnStrokeIsLockedOut() {
+    let swipe = thenHold(linear(.openPalm, from: [0.7, 0.5], to: [0.45, 0.5], over: 0.2, start: 0), for: 0.5)
+    let back = thenHold(linear(.openPalm, from: [0.45, 0.5], to: [0.7, 0.5], over: 0.2, start: swipe.last!.t + 1.0 / 30))
+    #expect(runSwipe(swipe + back) == [.discrete(.swipeLeft)])
 }

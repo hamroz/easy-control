@@ -14,6 +14,14 @@ public struct GestureConfig: Sendable {
     public var swipeMinDistance: Float = 0.15
     public var swipeDominance: Float = 2.0
     public var swipeWindow: Double = 0.25
+    /// A detected stroke only fires once the hand has settled for this many frames, still open and in frame.
+    public var swipeSettleFrames = 2
+    /// A stroke that hasn't settled within this time is dropped (continuous waving, gesturing while talking).
+    public var swipeSettleTimeout: Double = 0.5
+    /// Strokes ending this close to any frame edge are dropped: that's a hand leaving, not a swipe.
+    public var swipeEdgeMargin: Float = 0.1
+    /// After a swipe, the opposite direction is ignored this long, so the return stroke doesn't undo it.
+    public var swipeOppositeLockout: Double = 1.0
     public var scrollDeadZone: Float = 0.004
 
     public init() {}

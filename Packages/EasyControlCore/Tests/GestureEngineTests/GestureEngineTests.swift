@@ -27,6 +27,7 @@ private func engagedScript() -> FrameScript {
 @Test func palmSwipeAfterEngageSwitches() {
     var s = engagedScript()
     s.move(.openPalm, from: [0.5, 0.5], to: [0.25, 0.5], over: 0.2)
+    s.hold(.openPalm, at: [0.25, 0.5], for: 0.2)
     let events = run(s.frames)
     #expect(events.contains(where: isEngaged))
     #expect(events.filter { if case .discrete = $0 { return true }; return false } == [.discrete(.swipeLeft)])
@@ -69,8 +70,8 @@ private func engagedScript() -> FrameScript {
         s.appendFrame([SyntheticHand.make(.openPalm, center: [0.5, 0.5]), other])
     }
     let other = SyntheticHand.make(.two, center: [0.15, 0.3])
-    for i in 1...6 {
-        let x = 0.5 + 0.25 * Float(i) / 6
+    for i in 1...12 {
+        let x = 0.5 + 0.25 * Float(min(i, 6)) / 6
         s.appendFrame([SyntheticHand.make(.openPalm, center: [x, 0.5]), other])
     }
     let events = run(s.frames)
@@ -122,4 +123,11 @@ private func engagedScript() -> FrameScript {
     let events = run(s.frames)
     #expect(events.contains(.discrete(.swipeLeft)))
     #expect(!events.contains(.engagement(.idle)))
+}
+
+@Test func handDropAfterEngageDoesNothing() {
+    var s = engagedScript()
+    s.move(.openPalm, from: [0.5, 0.5], to: [0.5, 0.95], over: 0.25)
+    s.empty(for: 1.2)
+    #expect(!run(s.frames).contains { if case .discrete = $0 { return true }; return false })
 }
