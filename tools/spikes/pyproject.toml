@@ -1,0 +1,6 @@
+[project]
+name = "easycontrol-spikes"
+version = "0.0.0"
+description = "M0 spike helpers (throwaway)"
+requires-python = ">=3.11"
+dependencies = ["remotezip>=0.12"]
