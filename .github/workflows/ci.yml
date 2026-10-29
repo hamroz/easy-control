@@ -1,0 +1,13 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  core:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test EasyControlCore
+        run: swift test --package-path Packages/EasyControlCore
