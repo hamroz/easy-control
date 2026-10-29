@@ -2,6 +2,7 @@ import Capture
 import Foundation
 import GestureEngine
 import Observation
+import os
 
 @MainActor
 @Observable
@@ -50,8 +51,13 @@ final class AppModel {
         }
     }
 
+    @ObservationIgnored private let log = Logger(subsystem: "dev.hamroz.easycontrol", category: "permissions")
+
     func refreshPermissions() {
         let current = PermissionStatus.current()
+        if current != permissions || !started {
+            log.notice("camera=\(current.camera.rawValue, privacy: .public) accessibility=\(current.accessibility, privacy: .public) app=\(Bundle.main.bundlePath, privacy: .public)")
+        }
         let accessibilityChanged = current.accessibility != permissions.accessibility || !started
         permissions = current
         if accessibilityChanged { pipeline.setDispatchEnabled(current.accessibility) }

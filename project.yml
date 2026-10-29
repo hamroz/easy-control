@@ -34,6 +34,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.hamroz.easycontrol
         ENABLE_HARDENED_RUNTIME: YES
+        # One executable instead of a separate debug dylib, so a re-signed dev build stays loadable.
+        ENABLE_DEBUG_DYLIB: NO
         CODE_SIGN_STYLE: Manual
         CODE_SIGN_IDENTITY: "-"
     dependencies:

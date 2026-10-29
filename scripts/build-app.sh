@@ -27,5 +27,14 @@ xcodebuild -project EasyControl.xcodeproj -scheme EasyControl -configuration "$C
 }
 rm -rf build/EasyControl.app
 cp -R "build/DerivedData/Build/Products/$CONFIG/EasyControl.app" build/
+if [[ -z "$IDENTITY" ]]; then
+  # An ad-hoc signature's identity is the binary's hash, so macOS drops the Camera/Accessibility grants on
+  # every rebuild (System Settings still shows them on). Pin the identity to the bundle id instead.
+  # No hardened runtime here: that's for notarized release builds signed with a real identity.
+  codesign --force --sign - \
+    --entitlements App/Resources/EasyControl.entitlements \
+    --requirements '=designated => identifier "dev.hamroz.easycontrol"' \
+    build/EasyControl.app
+fi
 echo "warnings: $(grep -cE "warning:" build/xcodebuild.log || true)"
 echo "BUILD SUCCEEDED: build/EasyControl.app"
