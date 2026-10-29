@@ -57,8 +57,8 @@ public final class GestureEngine {
             infos.append(HandDebugInfo(id: tracked.id, pose: pose, probabilities: probs, features: features, hand: tracked.hand,
                                        rawPalmCenter: HandIdentityTracker.palmCenter(tracked.raw)))
         }
-        let present = Set(infos.map(\.id))
-        stabilizers = stabilizers.filter { present.contains($0.key) }
+        let active = tracker.activeIDs
+        stabilizers = stabilizers.filter { active.contains($0.key) }
 
         let suppressed = lastUserInput.map { t - $0 < config.inputSuppression } ?? false
         var observations = infos.map { HandObservation(id: $0.id, pose: $0.pose, palmSize: $0.features.palmSize, palmCenter: $0.features.palmCenter) }

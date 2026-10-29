@@ -34,7 +34,26 @@ import TestSupport
     let tracker = HandIdentityTracker()
     let hand = SyntheticHand.make(.openPalm)
     let first = tracker.update(HandFrame(timestamp: 0, hands: [hand]))[0].id
-    _ = tracker.update(HandFrame(timestamp: 0.25, hands: []))
-    let second = tracker.update(HandFrame(timestamp: 0.5, hands: [hand]))[0].id
+    _ = tracker.update(HandFrame(timestamp: 0.5, hands: []))
+    let second = tracker.update(HandFrame(timestamp: 1.2, hands: [hand]))[0].id
     #expect(first != second)
+}
+
+@Test func briefDropoutKeepsID() {
+    let tracker = HandIdentityTracker()
+    let first = tracker.update(HandFrame(timestamp: 0, hands: [SyntheticHand.make(.openPalm)]))[0].id
+    for i in 1...9 { _ = tracker.update(HandFrame(timestamp: Double(i) / 30, hands: [])) }
+    let back = tracker.update(HandFrame(timestamp: 0.33, hands: [SyntheticHand.make(.openPalm, center: [0.55, 0.5])]))[0].id
+    #expect(back == first)
+}
+
+@Test func chiralityFlipKeepsID() {
+    let tracker = HandIdentityTracker()
+    let first = tracker.update(HandFrame(timestamp: 0, hands: [SyntheticHand.make(.openPalm, chirality: .right)]))[0].id
+    var ids = Set<HandID>()
+    for i in 1...3 {
+        let hand = SyntheticHand.make(.openPalm, chirality: .left)
+        ids.formUnion(tracker.update(HandFrame(timestamp: Double(i) / 30, hands: [hand])).map(\.id))
+    }
+    #expect(ids == [first])
 }

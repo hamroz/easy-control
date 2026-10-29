@@ -23,14 +23,25 @@ public final class HandIdentityTracker {
 
     private let maxMatchDistance: Float
     private let filterParams: (Float, Float, Float)
-    private let dropAfter: Double = 0.25
+    /// How long an unseen hand keeps its identity. Matches the engine's hand-lost timeout, so a brief
+    /// detection dropout (motion blur, a stalled frame) doesn't turn the engaged hand into a stranger.
+    private let retainFor: Double
+    /// Extra match radius per second unseen: a returning hand may have moved.
+    private static let matchGrowthPerSecond: Float = 0.5
+    private static let maxMatchRadius: Float = 0.4
+    /// Vision's left/right guess can flicker, so a mismatch only makes a match less likely.
+    private static let chiralityMismatchPenalty: Float = 0.1
     private var tracks: [Track] = []
     private var nextID: HandID = 1
 
-    public init(maxMatchDistance: Float = 0.15, filterParams: (Float, Float, Float) = (1.7, 0.3, 1.0)) {
+    public init(maxMatchDistance: Float = 0.15, retainFor: Double = 1.0, filterParams: (Float, Float, Float) = (1.7, 0.3, 1.0)) {
         self.maxMatchDistance = maxMatchDistance
+        self.retainFor = retainFor
         self.filterParams = filterParams
     }
+
+    /// Identities currently tracked, including hands briefly unseen.
+    public var activeIDs: Set<HandID> { Set(tracks.map(\.id)) }
 
     public static func palmCenter(_ hand: Hand) -> SIMD2<Float> {
         let joints: [JointName] = [.wrist, .indexMCP, .middleMCP, .ringMCP, .littleMCP]
@@ -39,15 +50,17 @@ public final class HandIdentityTracker {
 
     public func update(_ frame: HandFrame) -> [TrackedHand] {
         let t = frame.timestamp
-        tracks.removeAll { t - $0.lastSeen > dropAfter || t < $0.lastSeen }
+        tracks.removeAll { t - $0.lastSeen > retainFor || t < $0.lastSeen }
 
         let centers = frame.hands.map(Self.palmCenter)
         var pairs: [(dist: Float, hand: Int, track: Int)] = []
         for (h, hand) in frame.hands.enumerated() {
-            for (k, track) in tracks.enumerated() where Self.compatible(hand.chirality, track.chirality) {
+            for (k, track) in tracks.enumerated() {
                 let d = centers[h] - track.center
-                let dist = (d * d).sum().squareRoot()
-                if dist <= maxMatchDistance { pairs.append((dist, h, k)) }
+                let penalty = Self.compatible(hand.chirality, track.chirality) ? 0 : Self.chiralityMismatchPenalty
+                let dist = (d * d).sum().squareRoot() + penalty
+                let radius = min(maxMatchDistance + Self.matchGrowthPerSecond * Float(t - track.lastSeen), Self.maxMatchRadius)
+                if dist <= radius { pairs.append((dist, h, k)) }
             }
         }
         var handToTrack: [Int: Int] = [:]
@@ -78,7 +91,7 @@ public final class HandIdentityTracker {
             }
             tracks[k].center = centers[h]
             tracks[k].lastSeen = t
-            if tracks[k].chirality == .unknown { tracks[k].chirality = hand.chirality }
+            if hand.chirality != .unknown { tracks[k].chirality = hand.chirality }
             result.append(TrackedHand(id: tracks[k].id, hand: smoothed, raw: hand, firstSeen: tracks[k].firstSeen))
         }
         return result

@@ -112,3 +112,14 @@ private func engagedScript() -> FrameScript {
     #expect(!direct.isEmpty)
     #expect(run(replayed) == direct)
 }
+
+@Test func shortDropoutKeepsEngagementAndSwipe() {
+    var s = engagedScript()
+    s.empty(for: 0.3)
+    s.hold(.openPalm, at: [0.5, 0.5], for: 0.2)
+    s.move(.openPalm, from: [0.5, 0.5], to: [0.25, 0.5], over: 0.2)
+    s.hold(.openPalm, at: [0.25, 0.5], for: 0.2)
+    let events = run(s.frames)
+    #expect(events.contains(.discrete(.swipeLeft)))
+    #expect(!events.contains(.engagement(.idle)))
+}
