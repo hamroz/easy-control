@@ -1,0 +1,14 @@
+.DS_Store
+.build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.swiftpm/
+# Python / training
+tools/**/.venv/
+__pycache__/
+*.pyc
+data/
+!tools/**/data/.gitkeep
+*.mlpackage/
+!App/Resources/*.mlpackage/
