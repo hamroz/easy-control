@@ -8,7 +8,7 @@ xcuserdata/
 tools/**/.venv/
 __pycache__/
 *.pyc
-data/
+/data/
 !tools/**/data/.gitkeep
 *.mlpackage/
 !App/Resources/*.mlpackage/
