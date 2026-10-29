@@ -37,4 +37,16 @@ Per class (legacy): fist 15/15, one 14/15, palm 15/15, peace 15/15. Chirality re
 - Vision `chirality` vs the user's actual hand after our mirroring (raise right hand → overlay shows "right" on the right).
 - End-to-end latency p50/p95 from the debug window.
 - Real CPU % in Activity Monitor while idle (10 fps) and engaged (30 fps).
-- Mission Control / App Exposé via Ctrl+↑/↓ with the same flags (checked in Task 10 with `ec-probe`).
+- Mission Control / App Exposé via Ctrl+↑/↓ with the same flags: posted by `ec-probe`, but opening could not be confirmed headlessly (window list shows no change without Screen Recording permission) — confirm visually.
+- Scroll direction/feel of `ec-probe scroll-demo down|up` in a real app (events are posted with phases and momentum; 45 momentum ticks after a 400 px drag).
+
+## 4. Live checks through the real Actions layer (Task 10, `ec-probe`)
+
+| Check | Result |
+|---|---|
+| `ec-probe space right` / `left` | Space 262 → 2720 → 262 ✔ |
+| `ec-probe monitor-selftest` | own (marked) events ignored ✔, unmarked events seen ✔ |
+| `ec-probe scroll-demo down/up` | posted 400 px + 45 momentum ticks each; visual check pending |
+| `ec-probe mission-control` | posted; visual check pending |
+
+Finding: events posted immediately before a process exits can be dropped — `ec-probe` now waits 0.3 s after posting. Not an issue for the long-running app.
