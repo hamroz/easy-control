@@ -1,0 +1,12 @@
+[project]
+name = "easycontrol-training"
+version = "0.1.0"
+description = "Trains EasyControl's pose classifier and exports it to Core ML"
+requires-python = ">=3.12,<3.13"
+dependencies = ["torch>=2.5,<2.8", "coremltools>=8.0", "numpy>=1.26,<2.3", "scikit-learn>=1.5"]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
