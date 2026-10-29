@@ -13,6 +13,10 @@ final class AppModel {
     private(set) var startError: String?
 
     let pipeline = Pipeline()
+    let recorder = LandmarkRecorder()
+    private(set) var isRecording = false
+    private(set) var lastRecording: URL?
+    private(set) var recordingError: String?
     @ObservationIgnored private var started = false
     @ObservationIgnored private var autoPause: AutoPause?
     @ObservationIgnored private var permissionTimer: Timer?
@@ -21,6 +25,7 @@ final class AppModel {
         pipeline.onSnapshot = { [weak self] snapshot in
             Task { @MainActor in self?.snapshot = snapshot }
         }
+        pipeline.onFrame = { [recorder] frame in recorder.append(frame) }
         autoPause = AutoPause { [weak self] paused in
             self?.autoPaused = paused
             self?.applyPause()
@@ -51,6 +56,21 @@ final class AppModel {
         permissions = current
         if accessibilityChanged { pipeline.setDispatchEnabled(current.accessibility) }
         if current.camera == .authorized, !started { startPipeline() }
+    }
+
+    func toggleRecording(label: String) {
+        do {
+            if isRecording {
+                lastRecording = try recorder.stop()
+            } else {
+                try recorder.start(label: label)
+            }
+            isRecording = recorder.isRecording
+            recordingError = nil
+        } catch {
+            recordingError = error.localizedDescription
+            isRecording = recorder.isRecording
+        }
     }
 
     private func startPipeline() {

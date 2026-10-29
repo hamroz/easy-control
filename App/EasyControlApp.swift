@@ -16,6 +16,11 @@ struct EasyControlApp: App {
         }
         .windowResizability(.contentSize)
         .defaultLaunchBehavior(PermissionStatus.current().allGranted ? .suppressed : .presented)
+
+        Window("EasyControl Debug", id: WindowID.debug) {
+            DebugView(model: model)
+        }
+        .defaultSize(width: 1000, height: 560)
     }
 }
 

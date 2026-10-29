@@ -9,6 +9,10 @@ struct MenuContent: View {
         Divider()
         Button(model.userPaused ? "Resume" : "Pause") { model.togglePause() }
             .keyboardShortcut("p")
+        Button("Debug Window…") {
+            openWindow(id: WindowID.debug)
+            NSApp.activate()
+        }
         Button("Permissions…") {
             openWindow(id: WindowID.permissions)
             NSApp.activate()

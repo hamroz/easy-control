@@ -42,3 +42,16 @@ import TestSupport
     script.hold(.fist, at: [0.5, 0.5], for: 1.0 / 30)
     #expect(abs(script.frames.last!.timestamp - (1.0 + 0.5)) < 1e-9)
 }
+
+@Test func recorderFileDecodes() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent("rec-\(UUID().uuidString).jsonl")
+    defer { try? FileManager.default.removeItem(at: url) }
+    var script = FrameScript(fps: 30)
+    script.hold(.two, at: [0.4, 0.6], for: 10.0 / 30)
+    let recorder = try HandFrameRecorder(url: url)
+    for frame in script.frames { try recorder.append(frame) }
+    try recorder.close()
+    let decoded = try HandFrameRecording.decode(Data(contentsOf: url))
+    #expect(decoded.count == 10)
+    #expect(decoded == script.frames)
+}
