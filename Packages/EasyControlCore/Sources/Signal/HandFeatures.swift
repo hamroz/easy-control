@@ -6,6 +6,9 @@ public struct HandFeatures: Sendable, Equatable {
     public var normalized: [SIMD2<Float>]
     /// Thumb...little.
     public var fingerExtended: [Bool]
+    /// Thumb...little: false when the finger's middle joint or tip was detected below the confidence threshold
+    /// (cut off by the frame edge, occluded), so its extension flag can't be trusted.
+    public var fingerKnown: [Bool]
     /// Bend angle in radians at each finger's middle joint (thumb: MP; others: PIP). π = straight.
     public var bendAngles: [Float]
     /// Mean of wrist and the four MCPs, in image coordinates.
@@ -34,8 +37,10 @@ public enum HandFeatureExtractor {
         }
 
         var extended: [Bool] = []
+        var known: [Bool] = []
         var bends: [Float] = []
         for (i, finger) in JointName.fingers.enumerated() {
+            known.append(hand[finger[1]].confidence >= minConfidence && hand[finger[3]].confidence >= minConfidence)
             let bend = angle(at: finger[1], finger[0], finger[2])
             bends.append(bend)
             if i == 0 {
@@ -52,6 +57,7 @@ public enum HandFeatureExtractor {
         return HandFeatures(
             normalized: points,
             fingerExtended: extended,
+            fingerKnown: known,
             bendAngles: bends,
             palmCenter: center,
             palmSize: size,

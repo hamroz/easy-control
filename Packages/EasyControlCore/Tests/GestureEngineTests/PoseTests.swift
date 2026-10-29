@@ -42,3 +42,12 @@ private func classify(_ pose: SyntheticPose) -> [PoseClass: Float] {
     for _ in 0..<3 { _ = s.update([.openPalm: 1]) }
     #expect(s.update([.openPalm: 0.5, .none: 0.5]) == .none)
 }
+
+@Test func lowConfidenceFingersAreNone() {
+    // A hand that looks like `two`, but the extended fingers' joints are barely detected (e.g. cut off by the frame edge).
+    var hand = SyntheticHand.make(.two)
+    for joint in [JointName.indexPIP, .indexDIP, .indexTip, .middlePIP, .middleDIP, .middleTip] {
+        hand[joint].confidence = 0.05
+    }
+    #expect(RuleBasedPoseClassifier().classify(HandFeatureExtractor.extract(hand)) == [.none: 1])
+}

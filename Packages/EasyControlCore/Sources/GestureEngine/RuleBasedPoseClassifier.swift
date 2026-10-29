@@ -5,7 +5,7 @@ public struct RuleBasedPoseClassifier: PoseClassifying {
     public init() {}
 
     public func classify(_ features: HandFeatures) -> [PoseClass: Float] {
-        guard features.isReliable else { return [.none: 1] }
+        guard features.isReliable, !features.fingerKnown.contains(false) else { return [.none: 1] }
         let e = features.fingerExtended
         let fingers = Array(e.dropFirst()) // index, middle, ring, little
         let pose: PoseClass = switch (e[0], fingers) {
