@@ -43,3 +43,21 @@ func detectsHandInSampleImage() throws {
     #expect(frame.hands.count >= 1)
     #expect(frame.hands[0].joints.filter { $0.confidence > 0.3 }.count >= 15)
 }
+
+@Test func stallDetector() {
+    var d = FrameStallDetector(timeout: 0.5)
+    #expect(!d.isStalled(at: 10))
+    d.frameArrived(at: 0)
+    #expect(!d.isStalled(at: 0.4))
+    #expect(d.isStalled(at: 0.6))
+    d.frameArrived(at: 0.7)
+    #expect(!d.isStalled(at: 0.8))
+}
+
+@Test func frameRateStaysInsideSupportedRanges() {
+    #expect(CameraCapture.chooseFrameRate(10, ranges: [1...30]) == 10)
+    #expect(CameraCapture.chooseFrameRate(10, ranges: [5...5, 30...30]) == 5)
+    #expect(CameraCapture.chooseFrameRate(10, ranges: [15...30]) == 15)
+    #expect(CameraCapture.chooseFrameRate(60, ranges: [1...30]) == 30)
+    #expect(CameraCapture.chooseFrameRate(10, ranges: []) == nil)
+}

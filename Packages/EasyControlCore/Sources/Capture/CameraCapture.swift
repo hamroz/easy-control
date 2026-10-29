@@ -40,13 +40,11 @@ public final class CameraCapture: NSObject, @unchecked Sendable {
         onStateChange?(.stopped)
     }
 
-    /// Clamps to what the camera supports.
+    /// Uses the closest rate the camera's active format supports.
     public func setFrameRate(_ fps: Double) {
         guard let device else { return }
-        let supported = device.activeFormat.videoSupportedFrameRateRanges
-        let maxRate = supported.map(\.maxFrameRate).max() ?? fps
-        let minRate = supported.map(\.minFrameRate).min() ?? fps
-        let rate = min(max(fps, minRate), maxRate)
+        let ranges = device.activeFormat.videoSupportedFrameRateRanges.map { $0.minFrameRate...$0.maxFrameRate }
+        guard let rate = Self.chooseFrameRate(fps, ranges: ranges) else { return }
         do {
             try device.lockForConfiguration()
             let duration = CMTime(value: 1000, timescale: CMTimeScale(rate * 1000))
@@ -56,6 +54,13 @@ public final class CameraCapture: NSObject, @unchecked Sendable {
         } catch {
             // Keep the current rate; the camera is still usable.
         }
+    }
+
+    /// A rate inside one of `ranges`: `fps` itself if supported, else the nearest range endpoint.
+    /// (Setting a duration outside every supported range raises an Objective-C exception.)
+    static func chooseFrameRate(_ fps: Double, ranges: [ClosedRange<Double>]) -> Double? {
+        if ranges.contains(where: { $0.contains(fps) }) { return fps }
+        return ranges.flatMap { [$0.lowerBound, $0.upperBound] }.min { abs($0 - fps) < abs($1 - fps) }
     }
 
     private func configure() throws {
