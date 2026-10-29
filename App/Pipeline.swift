@@ -24,12 +24,17 @@ final class Pipeline: @unchecked Sendable {
     private let dispatcher: ActionDispatcher
     private let monitor = InputActivityMonitor()
 
-    /// Called on the capture queue at most 10 times per second.
+    /// Set before `start()`; called on the capture queue at most 10 times per second.
     var onSnapshot: (@Sendable (PipelineSnapshot) -> Void)?
-    /// Called on the capture queue for every processed frame (used by the landmark recorder).
+    /// Set before `start()`; called on the capture queue for every processed frame (landmark recorder).
     var onFrame: (@Sendable (HandFrame) -> Void)?
 
     private var dispatchEnabled = false
+    private var paused = false
+    private var stall = FrameStallDetector()
+    private var watchdog: DispatchSourceTimer?
+    /// Last real-input time already acted on, so new input stops any coasting scroll exactly once.
+    private var handledUserInput: Double?
     private var latency = RollingPercentiles()
     private var frameTimes: [Double] = []
     private var lastHandSeen: Double = 0
@@ -54,16 +59,24 @@ final class Pipeline: @unchecked Sendable {
     }
 
     func start() throws {
-        monitor.start()
         try camera.start()
+        camera.queue.async { [self] in startWatchdog() }
     }
 
     /// Pausing stops the camera entirely, so the camera light goes off.
     func setPaused(_ paused: Bool) {
         camera.queue.async { [self] in
+            self.paused = paused
             let events = engine.setPaused(paused, at: CACurrentMediaTime())
             if dispatchEnabled { dispatcher.handle(events, at: CACurrentMediaTime()) }
-            if paused { camera.stop() } else { try? camera.start() }
+            if paused {
+                dispatcher.cancelMomentum()
+                stopMomentumTimer()
+                stall = FrameStallDetector()
+                camera.stop()
+            } else {
+                try? camera.start()
+            }
             publish(force: true)
         }
     }
@@ -72,8 +85,14 @@ final class Pipeline: @unchecked Sendable {
     func setDispatchEnabled(_ enabled: Bool) {
         camera.queue.async { [self] in
             dispatchEnabled = enabled
-            if enabled { monitor.start() }
+            if enabled { monitor.start() } // also recreates the tap after a re-grant
         }
+    }
+
+    /// Injection is only allowed while the typing guard is live; otherwise try to bring it back.
+    private var canDispatch: Bool {
+        guard dispatchEnabled else { return false }
+        return monitor.isRunning || monitor.start()
     }
 
     private func process(_ buffer: CVPixelBuffer, _ pts: Double) {
@@ -82,10 +101,12 @@ final class Pipeline: @unchecked Sendable {
         let t = abs(now - pts) < 1 ? pts : now
         guard let frame = try? detector.detect(buffer, timestamp: t) else { return }
         latestFrame = frame
+        stall.frameArrived(at: now)
         onFrame?(frame)
 
+        stopMomentumOnUserInput()
         let events = engine.process(frame, lastUserInput: monitor.lastUserInput)
-        if dispatchEnabled { dispatcher.handle(events, at: t) }
+        if canDispatch { dispatcher.handle(events, at: t) }
         updateMomentumTimer()
 
         let done = CACurrentMediaTime()
@@ -109,17 +130,46 @@ final class Pipeline: @unchecked Sendable {
         }
     }
 
+    /// Real keyboard/mouse input stops a coasting scroll, like touching a trackpad does.
+    private func stopMomentumOnUserInput() {
+        guard let input = monitor.lastUserInput, input != handledUserInput else { return }
+        handledUserInput = input
+        dispatcher.cancelMomentum()
+    }
+
+    /// If frames stop arriving without a pause (camera interrupted, disconnected, permission revoked),
+    /// feed the engine empty frames so open gestures end and engagement times out.
+    private func startWatchdog() {
+        guard watchdog == nil else { return }
+        let timer = DispatchSource.makeTimerSource(queue: camera.queue)
+        timer.schedule(deadline: .now() + 0.25, repeating: 0.25)
+        timer.setEventHandler { [weak self] in
+            guard let self, !paused else { return }
+            let now = CACurrentMediaTime()
+            guard stall.isStalled(at: now) else { return }
+            let events = engine.process(HandFrame(timestamp: now, hands: []), lastUserInput: monitor.lastUserInput)
+            if canDispatch { dispatcher.handle(events, at: now) }
+            dispatcher.cancelMomentum()
+            publish(force: true)
+        }
+        timer.resume()
+        watchdog = timer
+    }
+
+    private func stopMomentumTimer() {
+        momentumTimer?.cancel()
+        momentumTimer = nil
+    }
+
     private func updateMomentumTimer() {
         if dispatcher.isMomentumActive, momentumTimer == nil {
             let timer = DispatchSource.makeTimerSource(queue: camera.queue)
             timer.schedule(deadline: .now(), repeating: 1.0 / 60)
             timer.setEventHandler { [weak self] in
                 guard let self else { return }
+                stopMomentumOnUserInput()
                 dispatcher.tick(at: CACurrentMediaTime())
-                if !dispatcher.isMomentumActive {
-                    momentumTimer?.cancel()
-                    momentumTimer = nil
-                }
+                if !dispatcher.isMomentumActive { stopMomentumTimer() }
             }
             timer.resume()
             momentumTimer = timer

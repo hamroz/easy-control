@@ -31,11 +31,17 @@ Open **Debug Window…** from the menu-bar hand icon for every step below.
 - [ ] Quick open-palm swipe left/right → Space switches left/right.
 - [ ] Swipe up → Mission Control opens; swipe down → App Exposé. (Not verifiable headlessly.)
 - [ ] Slow hand drift does not swipe. Talking with hands while engaged produces no swipes.
+- [ ] Swipe, then bring the hand back to centre → exactly one Space switch (the return stroke is locked out for 1 s).
+- [ ] Engage, then lower the open hand to your lap → nothing fires. (Residual risk: if the lowered hand stays fully visible and open, it can still read as swipe-down; note how often.)
+- [ ] Swipes fire ~0.1 s after the hand stops, not mid-stroke; note whether that feels responsive.
 - [ ] `ec-probe scroll-demo down` scrolls the front window down (`swift run --package-path Packages/EasyControlCore ec-probe scroll-demo down`).
 
 ## 5. Safety guards
 - [ ] Type on the keyboard with a hand visible → panel shows "Suppressed"; no gestures fire.
 - [ ] Mid-scroll, touch the trackpad → scroll stops immediately.
+- [ ] Flick-scroll, release (open palm), then immediately type → the coasting stops at the first keystroke.
+- [ ] Flick-scroll, then lock the screen right away → after unlocking, nothing scrolls on its own.
+- [ ] While engaged, cover the camera / move the hand behind an object for ~0.3 s and back → still engaged.
 - [ ] Second person's hand in frame while engaged → only the engaged (green) hand drives gestures.
 - [ ] Dim the lights / bright window behind you → hands turn red (unreliable) instead of firing gestures.
 
