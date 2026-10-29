@@ -50,7 +50,14 @@ Open **Debug Window…** from the menu-bar hand icon for every step below.
 - [ ] Lock screen (⌃⌘Q) → camera light off; unlock → tracking resumes.
 - [ ] Close the lid / sleep → resumes after wake.
 
-## 7. Data for M3
+## 7. Learned classifier (M3)
+- [ ] Debug panel shows `Classifier: coreml` (not `rules`).
+- [ ] Hold each pose for a few seconds — open palm, fist, point (index up), two (V), three, OK, thumbs up, thumbs down — and note any the panel misreads: ____
+- [ ] Relaxed hand, half-curled fingers, an L-shape, four fingers: panel says `none`, not a gesture.
+- [ ] Both hands, near and far (palm size 0.06–0.2), side-lit and back-lit.
+
+## 8. Data for the false-trigger benchmark and pinch
 - [ ] Debug window → recorder label `normal-use` → record 5 minutes of ordinary work (typing, talking, coffee).
 - [ ] Record ~30 s for each pose label (open palm, fist, point, two, three, pinch, ok, thumbs up/down) with both hands, varied distance and angle.
 - [ ] Files land in `~/Library/Application Support/EasyControl/recordings/`.
+- [ ] Run `ec-replay --model App/Resources/PoseClassifier.mlpackage <normal-use recordings>` → target < 1 action/hour.
