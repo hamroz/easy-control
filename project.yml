@@ -36,6 +36,8 @@ targets:
         ENABLE_HARDENED_RUNTIME: YES
         # One executable instead of a separate debug dylib, so a re-signed dev build stays loadable.
         ENABLE_DEBUG_DYLIB: NO
+        # The model is used through CoreMLPoseClassifier, not a generated class.
+        COREML_CODEGEN_LANGUAGE: None
         CODE_SIGN_STYLE: Manual
         CODE_SIGN_IDENTITY: "-"
     dependencies:

@@ -42,6 +42,7 @@ struct DebugView: View {
             Text("Status").font(.headline)
             Text(model.statusText)
             Text("State: \(describe(s?.engine.state ?? .idle))")
+            Text("Classifier: \(s?.engine.classifierName ?? "–")")
             if s?.engine.suppressed == true { Text("Suppressed (keyboard/mouse in use)").foregroundStyle(.orange) }
             Text(String(format: "FPS: %.0f", s?.fps ?? 0))
             Text("Latency p50 / p95: \(ms(s?.latencyP50)) / \(ms(s?.latencyP95))")

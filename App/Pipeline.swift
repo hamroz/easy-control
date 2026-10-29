@@ -5,6 +5,7 @@ import Foundation
 import GestureEngine
 import HandTracking
 import QuartzCore
+import os
 
 struct PipelineSnapshot: Sendable {
     var engine: EngineSnapshot
@@ -20,7 +21,7 @@ struct PipelineSnapshot: Sendable {
 final class Pipeline: @unchecked Sendable {
     let camera = CameraCapture()
     private let detector = VisionHandDetector()
-    private let engine = GestureEngine()
+    private let engine = GestureEngine(classifier: Pipeline.loadClassifier())
     private let dispatcher: ActionDispatcher
     private let monitor = InputActivityMonitor()
 
@@ -55,6 +56,23 @@ final class Pipeline: @unchecked Sendable {
         camera.onStateChange = { [weak self] state in
             guard let self else { return }
             camera.queue.async { self.captureState = state; self.publish(force: true) }
+        }
+    }
+
+    /// The bundled Core ML model; the rule-based classifier if it's missing or fails to load.
+    private static func loadClassifier() -> any PoseClassifying {
+        let log = Logger(subsystem: "dev.hamroz.easycontrol", category: "classifier")
+        guard let url = Bundle.main.url(forResource: "PoseClassifier", withExtension: "mlmodelc") else {
+            log.error("PoseClassifier.mlmodelc not in bundle; using rules")
+            return RuleBasedPoseClassifier()
+        }
+        do {
+            let classifier = try CoreMLPoseClassifier(compiledModelURL: url)
+            log.notice("loaded Core ML pose classifier")
+            return classifier
+        } catch {
+            log.error("Core ML model failed to load (\(error.localizedDescription, privacy: .public)); using rules")
+            return RuleBasedPoseClassifier()
         }
     }
 

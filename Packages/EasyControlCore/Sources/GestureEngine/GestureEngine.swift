@@ -17,6 +17,7 @@ public struct EngineSnapshot: Sendable {
     public var hands: [HandDebugInfo] = []
     public var lastEvent: GestureEvent?
     public var suppressed = false
+    public var classifierName = ""
 }
 
 /// Landmarks in, gesture events out. Pure and deterministic given frame timestamps, so it can be replay-tested.
@@ -85,8 +86,8 @@ public final class GestureEngine {
             if events.contains(where: Self.isActivity) { engagement.noteActivity(at: t) }
         }
 
-        snapshot = EngineSnapshot(state: engagement.state, hands: infos,
-                                  lastEvent: events.last ?? snapshot.lastEvent, suppressed: suppressed)
+        snapshot = EngineSnapshot(state: engagement.state, hands: infos, lastEvent: events.last ?? snapshot.lastEvent,
+                                  suppressed: suppressed, classifierName: classifier.name)
         return events
     }
 

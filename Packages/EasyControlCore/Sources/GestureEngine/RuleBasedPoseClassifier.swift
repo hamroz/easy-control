@@ -2,6 +2,8 @@ import Signal
 
 /// Bootstrap classifier from finger-extension flags. Replaced by the Core ML classifier in M3.
 public struct RuleBasedPoseClassifier: PoseClassifying {
+    public let name = "rules"
+
     public init() {}
 
     public func classify(_ features: HandFeatures) -> [PoseClass: Float] {

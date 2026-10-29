@@ -11,6 +11,7 @@ let package = Package(
         ),
         .executable(name: "ec-probe", targets: ["ec-probe"]),
         .executable(name: "ec-extract", targets: ["ec-extract"]),
+        .executable(name: "ec-replay", targets: ["ec-replay"]),
     ],
     targets: [
         .target(name: "HandTracking"),
@@ -21,6 +22,7 @@ let package = Package(
         .target(name: "TestSupport", dependencies: ["HandTracking"]),
         .executableTarget(name: "ec-probe", dependencies: ["Actions"]),
         .executableTarget(name: "ec-extract", dependencies: ["Capture", "Signal"]),
+        .executableTarget(name: "ec-replay", dependencies: ["GestureEngine"]),
         .testTarget(name: "HandTrackingTests", dependencies: ["HandTracking", "TestSupport"]),
         .testTarget(name: "SignalTests", dependencies: ["Signal", "TestSupport"]),
         .testTarget(name: "GestureEngineTests", dependencies: ["GestureEngine", "TestSupport"]),
