@@ -11,3 +11,15 @@ jobs:
       - uses: actions/checkout@v4
       - name: Test EasyControlCore
         run: swift test --package-path Packages/EasyControlCore
+
+  app:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Build app
+        run: |
+          xcodegen generate
+          xcodebuild -project EasyControl.xcodeproj -scheme EasyControl -configuration Debug \
+            -derivedDataPath build/DerivedData CODE_SIGNING_ALLOWED=NO build

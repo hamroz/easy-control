@@ -32,7 +32,10 @@ public final class InputActivityMonitor: @unchecked Sendable {
 
         let ready = DispatchSemaphore(value: 0)
         let thread = Thread { [weak self] in
-            guard let self, let source = CFMachPortCreateRunLoopSource(nil, tap, 0) else { ready.signal(); return }
+            guard let self, let tap = self.tap, let source = CFMachPortCreateRunLoopSource(nil, tap, 0) else {
+                ready.signal()
+                return
+            }
             self.runLoop = CFRunLoopGetCurrent()
             CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
             CGEvent.tapEnable(tap: tap, enable: true)
