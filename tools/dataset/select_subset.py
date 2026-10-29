@@ -11,6 +11,8 @@ def select(records: dict[str, dict], source: str, split: str, n: int, seed: int 
     out = []
     for image_id in sorted(picked):
         rec = records[image_id]
+        if not rec.get("user_id"):
+            continue  # without a subject id the split can't be checked for leakage
         boxes = [
             {"label": SOURCE_TO_TARGET[label], "bbox": bbox}
             for label, bbox in zip(rec["labels"], rec["bboxes"])

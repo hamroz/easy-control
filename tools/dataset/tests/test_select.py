@@ -39,3 +39,10 @@ def test_manifest_splits_are_subject_disjoint():
     with pytest.raises(ValueError):
         check_disjoint(manifest)
     check_disjoint([{"image_id": "a", "split": "train", "user_id": "u1"}, {"image_id": "b", "split": "test", "user_id": "u2"}])
+
+
+def test_select_drops_records_without_subject():
+    recs = records(10)
+    recs["img3"]["user_id"] = None
+    out = select(recs, "palm", "train", 10)
+    assert len(out) == 9 and all(r["user_id"] for r in out)
