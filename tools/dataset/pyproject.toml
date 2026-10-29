@@ -1,0 +1,12 @@
+[project]
+name = "easycontrol-dataset"
+version = "0.1.0"
+description = "Selects and downloads the HaGRID subset used to train EasyControl's pose classifier"
+requires-python = ">=3.11"
+dependencies = ["remotezip>=0.12"]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
