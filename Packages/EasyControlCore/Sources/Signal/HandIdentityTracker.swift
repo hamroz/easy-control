@@ -43,10 +43,7 @@ public final class HandIdentityTracker {
     /// Identities currently tracked, including hands briefly unseen.
     public var activeIDs: Set<HandID> { Set(tracks.map(\.id)) }
 
-    public static func palmCenter(_ hand: Hand) -> SIMD2<Float> {
-        let joints: [JointName] = [.wrist, .indexMCP, .middleMCP, .ringMCP, .littleMCP]
-        return joints.reduce(SIMD2<Float>.zero) { $0 + hand[$1].position } / Float(joints.count)
-    }
+    public static func palmCenter(_ hand: Hand) -> SIMD2<Float> { hand.palmCenter }
 
     public func update(_ frame: HandFrame) -> [TrackedHand] {
         let t = frame.timestamp

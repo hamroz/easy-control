@@ -49,3 +49,11 @@ public struct HandFrame: Codable, Sendable, Equatable {
 public protocol HandLandmarkSource: Sendable {
     var frames: AsyncStream<HandFrame> { get }
 }
+
+extension Hand {
+    /// Mean of the wrist and the four finger MCPs: a stable point that doesn't move when fingers do.
+    public var palmCenter: SIMD2<Float> {
+        let joints: [JointName] = [.wrist, .indexMCP, .middleMCP, .ringMCP, .littleMCP]
+        return joints.reduce(SIMD2<Float>.zero) { $0 + self[$1].position } / Float(joints.count)
+    }
+}
