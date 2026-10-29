@@ -27,5 +27,5 @@ xcodebuild -project EasyControl.xcodeproj -scheme EasyControl -configuration "$C
 }
 rm -rf build/EasyControl.app
 cp -R "build/DerivedData/Build/Products/$CONFIG/EasyControl.app" build/
-grep -cE "warning:" build/xcodebuild.log | xargs -I{} echo "warnings: {}"
+echo "warnings: $(grep -cE "warning:" build/xcodebuild.log || true)"
 echo "BUILD SUCCEEDED: build/EasyControl.app"
