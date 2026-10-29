@@ -12,7 +12,11 @@ public struct GestureID: RawRepresentable, Hashable, Codable, Sendable, CustomSt
 }
 
 public enum Phase: String, Codable, Sendable {
-    case began, changed, ended
+    case began, changed
+    /// The user finished the gesture (e.g. changed pose): continuous actions may coast (scroll momentum).
+    case ended
+    /// The gesture was interrupted (hand lost, typing, pause, disengage): stop immediately, no momentum.
+    case cancelled
 }
 
 public enum GestureEvent: Equatable, Sendable {

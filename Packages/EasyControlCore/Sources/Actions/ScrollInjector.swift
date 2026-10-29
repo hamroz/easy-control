@@ -38,6 +38,10 @@ public final class ScrollInjector {
             recent.append((t, px))
             recent.removeAll { t - $0.t > Self.velocityWindow }
             sink.post(.scroll(dx: Int32(px.x.rounded()), dy: Int32(px.y.rounded()), phase: .changed, momentum: .none))
+        case .cancelled:
+            recent.removeAll()
+            stopMomentum()
+            sink.post(.scroll(dx: 0, dy: 0, phase: .ended, momentum: .none))
         case .ended:
             sink.post(.scroll(dx: 0, dy: 0, phase: .ended, momentum: .none))
             let window = recent.filter { t - $0.t <= Self.velocityWindow }
@@ -63,6 +67,11 @@ public final class ScrollInjector {
                           momentum: momentumStarted ? .continue : .began))
         momentumStarted = true
         momentumVelocity = v
+    }
+
+    /// Stops any coasting immediately (real input arrived, tracking paused).
+    public func cancelMomentum() {
+        stopMomentum()
     }
 
     private func stopMomentum() {

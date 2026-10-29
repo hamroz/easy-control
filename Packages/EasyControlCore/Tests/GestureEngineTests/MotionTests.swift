@@ -52,7 +52,7 @@ private func runSwipe(_ samples: [Sample]) -> [GestureEvent] {
 @Test func scrollEndsWhenHandLost() {
     var r = ScrollRecognizer(config: .default)
     _ = r.update(pose: .two, palmCenter: [0.5, 0.5], at: 0)
-    #expect(r.update(pose: .none, palmCenter: nil, at: 0.033) == .continuous(.scroll, phase: .ended, delta: .zero))
+    #expect(r.update(pose: .none, palmCenter: nil, at: 0.033) == .continuous(.scroll, phase: .cancelled, delta: .zero))
 }
 
 @Test func fastLeftSwipeFires() {

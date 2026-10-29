@@ -56,7 +56,7 @@ private func engagedScript() -> FrameScript {
     s.move(.two, from: [0.5, 0.5], to: [0.5, 0.6], over: 0.3)
     s.empty(for: 1.1)
     let events = run(s.frames)
-    let ended = events.firstIndex(of: .continuous(.scroll, phase: .ended, delta: .zero))
+    let ended = events.firstIndex(of: .continuous(.scroll, phase: .cancelled, delta: .zero))
     let idle = events.firstIndex(of: .engagement(.idle))
     #expect(ended != nil && idle != nil)
     #expect(ended! < idle!)
@@ -87,7 +87,7 @@ private func engagedScript() -> FrameScript {
     s.move(.two, from: [0.5, 0.6], to: [0.5, 0.8], over: 0.4)
     let events = run(s.frames) { $0.timestamp >= typedAt ? typedAt : nil }
     let scrolls = scrollEvents(events)
-    #expect(scrolls.last == .continuous(.scroll, phase: .ended, delta: .zero))
+    #expect(scrolls.last == .continuous(.scroll, phase: .cancelled, delta: .zero))
     #expect(scrolls.filter { $0 == .continuous(.scroll, phase: .began, delta: .zero) }.count == 1)
 }
 

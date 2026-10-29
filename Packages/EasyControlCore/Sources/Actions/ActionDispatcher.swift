@@ -34,6 +34,11 @@ public final class ActionDispatcher {
         scroll.tick(at: t)
     }
 
+    /// Call when real keyboard/mouse input arrives or tracking pauses: coasting scroll must not continue.
+    public func cancelMomentum() {
+        scroll.cancelMomentum()
+    }
+
     private func perform(_ action: Action) {
         switch action {
         case .switchSpace(let direction): spaces.switchSpace(direction)
