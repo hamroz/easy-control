@@ -2,7 +2,7 @@
 
 Control your Mac with hand gestures through the built-in camera. Everything runs on-device: Apple Vision finds 21 hand landmarks per hand, and EasyControl's own gesture engine turns them into scrolling, Space switching and Mission Control — no cloud, no LLM, no frames ever stored.
 
-> **Status: M3.5.** Engage with an open palm (or two/three fingers), scroll with two fingers, and drag three fingers to move between Spaces or pull open Mission Control — the Dock follows your hand like a trackpad. Poses are recognized by EasyControl's own Core ML classifier (94.9 % end to end on people it has never seen; when it acts on a gesture it is right 98.2 % of the time). Cursor mode (M4) and custom gestures (M5) are next. See the [design spec](docs/superpowers/specs/2026-10-29-easycontrol-design.md).
+> **Status: M3.5.** Engage with an open palm (or two/three fingers), scroll with two fingers, and drag three fingers to move between Spaces or pull open Mission Control — the Dock follows your hand like a trackpad. Poses are recognized by EasyControl's own Core ML classifier (94.3 % end to end on people it has never seen; when it acts on a gesture it is right 97.8 % of the time). Cursor mode (M4) and custom gestures (M5) are next. See the [design spec](docs/superpowers/specs/2026-10-29-easycontrol-design.md).
 
 ## How it works
 
@@ -41,9 +41,11 @@ Measured end to end on HaGRID's held-out subjects, counting every detected hand 
 | When it acts on a gesture, it is right | **97.8 %** | — |
 | Non-gesture hands turned into a gesture | **1.7 %** | — |
 
-**Personalization:** the debug window's recorder lets you record your own poses; `ec-extract --recordings` adds them to training (temporal 60/15/25 split per recording). On held-out parts of the author's recordings, accuracy went from 76.5 % (HaGRID only) to 84.9 %, and `pinch` — absent from HaGRID — went from 0 % to 47 %. In 10 minutes of normal computer use, the engine fired **zero** actions.
+**Personalization:** the debug window's recorder lets you record your own poses; `ec-extract --recordings` adds them to training (temporal 60/15/25 split per recording). On held-out parts of the author's recordings, accuracy went from 76.5 % (HaGRID only) to 84.9 % — 80.7 % → 87.0 % excluding `pinch`, which HaGRID lacks and which went from 0 % to 47 % ([docs/eval/m3-personal-baseline.json](docs/eval/m3-personal-baseline.json)).
 
-\* The rules cover only 6 of the 10 classes. The spec's 97 % target is **not yet met** end to end, and the false-trigger benchmark awaits real recordings, so M3 is code-complete but not exited.
+False triggers: replaying the held-out 2.5 minutes of the author's normal-use recording through the current engine and model fired **zero** actions (`ec-replay --segment test`, no typing suppression applied). That is too short to establish the < 1 action/hour target; it needs about an hour of normal-use recording.
+
+\* The rules cover only 6 of the 10 classes. The spec's 97 % target is **not yet met** end to end, and the false-trigger target needs a longer normal-use recording, so M3 is code-complete but not exited.
 
 Full results, per-class metrics, confusion matrix and model selection: [docs/eval/m3-report.md](docs/eval/m3-report.md). The model is 196 KB, runs on the CPU in well under a millisecond, and is licensed CC BY-SA 4.0 ([App/Resources/MODEL_LICENSE.md](App/Resources/MODEL_LICENSE.md)).
 

@@ -51,7 +51,7 @@ Spec target (≥ 97 % accuracy): judged on **accuracy acting at ≥ 0.85, end to
 
 The user's own recordings were added to training (10940 rows incl. flipped copies, counted ×10) and evaluated on the **last 25 % of each recording** (2276 hands), which the model never saw. Same person, so this measures fit to the user, not generalization; the HaGRID numbers above exclude every personal row.
 
-Accuracy acting at ≥ 0.85: **84.9%**; `none` hands turned into a gesture: 0.4%.
+Accuracy acting at ≥ 0.85: **84.9%** (the HaGRID-only model scored 76.5 % on the same rows, 80.7 % vs 87.0 % excluding `pinch`; see `docs/eval/m3-personal-baseline.json`); `none` hands turned into a gesture: 0.4%.
 
 | Class | Recall | Support |
 |---|---|---|
@@ -78,7 +78,7 @@ How much the personal rows count was chosen on each recording's validation slice
 
 Chosen: gate `reliable`, class-weight power 0.5, MLP 55→256→128→10 (dropout 0.2, AdamW lr 1e-3, early stopping on validation; best epoch 41). Standardization is folded into the model. Training rows include a chirality-flipped copy of every hand so the model does not depend on Vision's left/right guess; features are aspect-ratio corrected and include absolute orientation.
 
-Selection criterion: highest validation accuracy at the app threshold, gated rows counted as none (validation split only).
+Selection criterion: highest validation accuracy at the app threshold, gated rows counted as none (validation split only). Note: this sweep was run before `pinch` and the personal recordings were added; the chosen configuration was reused, not re-validated with 10 classes.
 
 | Gate | Class-weight power | Hidden | Val acc @ threshold | Val gesture precision | Val none→gesture |
 |---|---|---|---|---|---|
