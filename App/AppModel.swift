@@ -110,7 +110,8 @@ final class AppModel {
         }
         switch snapshot?.engine.state ?? .idle {
         case .paused: return "Paused"
-        case .idle: return "Watching: show an open palm to start"
+        case .idle: return "Watching: open palm (or two/three fingers) to start"
+        case .standby: return "Standby: make a gesture to continue"
         case .engaged(_, .command): return "Engaged: gestures active"
         case .engaged(_, .cursor): return "Cursor mode"
         }

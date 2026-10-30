@@ -57,9 +57,9 @@ private func engagedScript() -> FrameScript {
     s.empty(for: 1.1)
     let events = run(s.frames)
     let ended = events.firstIndex(of: .continuous(.scroll, phase: .cancelled, delta: .zero))
-    let idle = events.firstIndex(of: .engagement(.idle))
-    #expect(ended != nil && idle != nil)
-    #expect(ended! < idle!)
+    let standby = events.firstIndex(of: .engagement(.standby))
+    #expect(ended != nil && standby != nil)
+    #expect(ended! < standby!)
 }
 
 @Test func secondHandIsIgnored() {
@@ -122,7 +122,7 @@ private func engagedScript() -> FrameScript {
     s.hold(.openPalm, at: [0.25, 0.5], for: 0.2)
     let events = run(s.frames)
     #expect(events.contains(.discrete(.swipeLeft)))
-    #expect(!events.contains(.engagement(.idle)))
+    #expect(!events.contains(.engagement(.idle)) && !events.contains(.engagement(.standby)))
 }
 
 @Test func handDropAfterEngageDoesNothing() {

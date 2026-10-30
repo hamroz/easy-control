@@ -35,21 +35,20 @@ private func feed(_ c: inout EngagementController, _ hands: [HandObservation], f
     #expect(c.state == .idle)
 }
 
-@Test func disengagesWhenHandLost() {
+@Test func handLostEntersStandby() {
     var c = EngagementController(config: .default)
     var t = feed(&c, [obs(.openPalm)], from: 0, for: 0.5)
-    #expect(c.state != .idle)
     t = feed(&c, [], from: t, for: 1.0)
-    #expect(c.state != .idle)
+    #expect(c.state == .engaged(hand: 1, mode: .command))
     feed(&c, [], from: t, for: 0.2)
-    #expect(c.state == .idle)
+    #expect(c.state == .standby)
 }
 
-@Test func disengagesAfterIdleTimeout() {
+@Test func idleTimeoutEntersStandby() {
     var c = EngagementController(config: .default)
     let t = feed(&c, [obs(.openPalm)], from: 0, for: 0.5)
     feed(&c, [obs(.openPalm)], from: t, for: 3.1)
-    #expect(c.state == .idle)
+    #expect(c.state == .standby)
 
     var d = EngagementController(config: .default)
     var u = feed(&d, [obs(.openPalm)], from: 0, for: 0.5)
@@ -59,11 +58,59 @@ private func feed(_ c: inout EngagementController, _ hands: [HandObservation], f
     #expect(d.state == .engaged(hand: 1, mode: .command))
 }
 
-@Test func noReengageWithoutRelease() {
+@Test func handLostEntersStandbyAndReturnResumes() {
+    var c = EngagementController(config: .default)
+    var t = feed(&c, [obs(.openPalm)], from: 0, for: 0.5)
+    t = feed(&c, [], from: t, for: 2)
+    #expect(c.state == .standby)
+    t = feed(&c, [obs(.none, id: 2)], from: t, for: 2.0 / 30) // returning hand, pose not yet stable
+    #expect(c.state == .standby)
+    _ = c.update(hands: [obs(.openPalm, id: 2)], at: t)        // first gesture frame: no hold needed
+    #expect(c.state == .engaged(hand: 2, mode: .command))
+}
+
+@Test func switchingToScrollPoseResumesFromStandby() {
+    var c = EngagementController(config: .default)
+    var t = feed(&c, [obs(.openPalm)], from: 0, for: 0.5)
+    t = feed(&c, [obs(.openPalm)], from: t, for: 3.2) // idle → standby, palm still raised
+    #expect(c.state == .standby)
+    _ = c.update(hands: [obs(.two)], at: t)
+    #expect(c.state == .engaged(hand: 1, mode: .command))
+}
+
+@Test func stillPalmDoesNotFlap() {
+    var c = EngagementController(config: .default)
+    var changes: [EngagementState] = []
+    for i in 0..<(30 * 20) {
+        if let s = c.update(hands: [obs(.openPalm)], at: Double(i) / 30) { changes.append(s) }
+    }
+    #expect(changes == [.engaged(hand: 1, mode: .command), .standby, .idle])
+}
+
+@Test func standbyExpiresToIdle() {
     var c = EngagementController(config: .default)
     let t = feed(&c, [obs(.openPalm)], from: 0, for: 0.5)
-    feed(&c, [obs(.openPalm)], from: t, for: 5)
+    feed(&c, [], from: t, for: 16.2)
     #expect(c.state == .idle)
+}
+
+@Test func relaxedHandDoesNotResume() {
+    var c = EngagementController(config: .default)
+    var t = feed(&c, [obs(.openPalm)], from: 0, for: 0.5)
+    t = feed(&c, [], from: t, for: 1.2)
+    feed(&c, [obs(.none, id: 3)], from: t, for: 2)
+    feed(&c, [obs(.fist, id: 3)], from: t + 2, for: 2)
+    #expect(c.state == .standby)
+}
+
+@Test func twoOrThreeFingersEngageDirectly() {
+    for pose in [PoseClass.two, .three] {
+        var c = EngagementController(config: .default)
+        let t = feed(&c, [obs(pose)], from: 0, for: 0.25)
+        #expect(c.state == .idle)
+        feed(&c, [obs(pose)], from: t, for: 0.1)
+        #expect(c.state == .engaged(hand: 1, mode: .command), "\(pose)")
+    }
 }
 
 @Test func largestPalmWins() {

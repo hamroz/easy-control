@@ -99,6 +99,7 @@ struct DebugView: View {
         switch state {
         case .paused: "paused"
         case .idle: "idle"
+        case .standby: "standby"
         case .engaged(let hand, let mode): "engaged #\(hand) (\(mode.rawValue))"
         }
     }

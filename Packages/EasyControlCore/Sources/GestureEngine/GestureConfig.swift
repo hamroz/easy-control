@@ -4,6 +4,10 @@ public struct GestureConfig: Sendable {
     public var poseExit: Float = 0.60
     public var poseEnterFrames = 3
     public var wakeHold: Double = 0.4
+    /// Two or three fingers held this long engage directly from idle.
+    public var directEngageHold: Double = 0.3
+    /// After engagement ends (hand left or went idle), any move into a gesture pose resumes it instantly.
+    public var standbyDuration: Double = 15
     public var idleTimeout: Double = 3.0
     public var handLostTimeout: Double = 1.0
     public var inputSuppression: Double = 0.5
