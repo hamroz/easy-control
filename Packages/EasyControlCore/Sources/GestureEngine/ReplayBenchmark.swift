@@ -29,3 +29,16 @@ public enum ReplayBenchmark {
         return stats
     }
 }
+
+extension ReplayBenchmark {
+    /// Stable pose of the most confident hand in each frame that has one (how the engine read a recording).
+    public static func poseHistogram(_ frames: [HandFrame], engine: GestureEngine) -> [PoseClass: Int] {
+        var histogram: [PoseClass: Int] = [:]
+        for frame in frames {
+            _ = engine.process(frame, lastUserInput: nil)
+            guard let hand = engine.snapshot.hands.max(by: { $0.features.palmSize < $1.features.palmSize }) else { continue }
+            histogram[hand.pose, default: 0] += 1
+        }
+        return histogram
+    }
+}

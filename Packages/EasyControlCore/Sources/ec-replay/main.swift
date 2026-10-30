@@ -13,9 +13,37 @@ if let i = args.firstIndex(of: "--model"), args.indices.contains(i + 1) {
     classifier = try CoreMLPoseClassifier(compiledModelURL: compiled)
     args.removeSubrange(i...(i + 1))
 }
+let poseMode = args.contains("--poses")
+args.removeAll { $0 == "--poses" }
 guard !args.isEmpty else {
-    print("usage: ec-replay [--model <mlpackage>] <recording.jsonl>...")
+    print("usage: ec-replay [--model <mlpackage>] [--poses] <recording.jsonl>...")
     exit(2)
+}
+
+if poseMode {
+    // How the engine reads each recording: share of hand frames per stable pose (largest hand).
+    for path in args {
+        let frames = try HandFrameRecording.decode(Data(contentsOf: URL(fileURLWithPath: path)))
+        let histogram = ReplayBenchmark.poseHistogram(frames, engine: GestureEngine(classifier: classifier))
+        let total = max(histogram.values.reduce(0, +), 1)
+        let parts = histogram.sorted { $0.value > $1.value }.prefix(4)
+            .map { "\($0.key.rawValue) \(Int((Double($0.value) / Double(total) * 100).rounded()))%" }
+        // Raw best guess and its confidence, before the 0.85 threshold and 3-frame stabilizer.
+        let engine = GestureEngine(classifier: classifier)
+        var raw: [PoseClass: Int] = [:], confident = 0, counted = 0
+        for frame in frames {
+            _ = engine.process(frame, lastUserInput: nil)
+            guard let hand = engine.snapshot.hands.max(by: { $0.features.palmSize < $1.features.palmSize }),
+                  let top = hand.probabilities.max(by: { $0.value < $1.value }) else { continue }
+            raw[top.key, default: 0] += 1
+            counted += 1
+            if top.value >= 0.85 { confident += 1 }
+        }
+        let rawParts = raw.sorted { $0.value > $1.value }.prefix(3)
+            .map { "\($0.key.rawValue) \(Int((Double($0.value) / Double(max(counted, 1)) * 100).rounded()))%" }
+        print("\((path as NSString).lastPathComponent): stable [\(parts.joined(separator: ", "))]  raw [\(rawParts.joined(separator: ", "))]  ≥0.85: \(Int(Double(confident) / Double(max(counted, 1)) * 100))%")
+    }
+    exit(0)
 }
 
 print("classifier: \(classifier.name)")

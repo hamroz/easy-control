@@ -26,3 +26,12 @@ import TestSupport
     #expect(stats.engagements == 0 && stats.discreteEvents == 0 && stats.scrollsBegan == 0)
     #expect(stats.actionsPerHour == 0)
 }
+
+@Test func poseHistogramCountsStablePosesPerFrame() {
+    var s = FrameScript()
+    s.hold(.fist, at: [0.5, 0.5], for: 1)
+    s.empty(for: 0.5)
+    let histogram = ReplayBenchmark.poseHistogram(s.frames, engine: GestureEngine())
+    #expect(histogram[.fist, default: 0] >= 27) // 30 frames minus the stabilizer's 2-frame warm-up
+    #expect(histogram.values.reduce(0, +) == 30) // only frames with a hand count
+}
