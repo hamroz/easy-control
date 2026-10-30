@@ -1,3 +1,4 @@
+import AppKit
 import Capture
 import Foundation
 import GestureEngine
@@ -30,6 +31,9 @@ final class AppModel {
         autoPause = AutoPause { [weak self] paused in
             self?.autoPaused = paused
             self?.applyPause()
+        }
+        NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) {
+            [pipeline] _ in pipeline.prepareToQuit()
         }
         permissionTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshPermissions() }

@@ -89,13 +89,23 @@ final class Pipeline: @unchecked Sendable {
             if dispatchEnabled { dispatcher.handle(events, at: CACurrentMediaTime()) }
             if paused {
                 dispatcher.cancelMomentum()
-                stopMomentumTimer()
+                updateMomentumTimer() // keep ticking so the Dock's end re-sends go out while paused
                 stall = FrameStallDetector()
                 camera.stop()
             } else {
                 try? camera.start()
             }
             publish(force: true)
+        }
+    }
+
+    /// Ends any open scroll or Dock swipe before the app quits, so nothing is left mid-transition.
+    func prepareToQuit() {
+        camera.queue.sync {
+            let now = CACurrentMediaTime()
+            let events = engine.setPaused(true, at: now)
+            if dispatchEnabled { dispatcher.handle(events, at: now) }
+            dispatcher.cancelMomentum()
         }
     }
 
@@ -168,6 +178,7 @@ final class Pipeline: @unchecked Sendable {
             let events = engine.process(HandFrame(timestamp: now, hands: []), lastUserInput: monitor.lastUserInput)
             if canDispatch { dispatcher.handle(events, at: now) }
             dispatcher.cancelMomentum()
+            updateMomentumTimer()
             publish(force: true)
         }
         timer.resume()
