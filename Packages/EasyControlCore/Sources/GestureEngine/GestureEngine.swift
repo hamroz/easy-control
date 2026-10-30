@@ -66,10 +66,11 @@ public final class GestureEngine {
         stabilizers = stabilizers.filter { active.contains($0.key) }
 
         let suppressed = lastUserInput.map { t - $0 < config.inputSuppression } ?? false
-        var observations = infos.map { HandObservation(id: $0.id, pose: $0.pose, palmSize: $0.features.palmSize, palmCenter: $0.features.palmCenter) }
-        if suppressed, engagement.state == .idle { observations = [] } // typing never wakes the engine
-
-        if let newState = engagement.update(hands: observations, at: t) {
+        let observations = infos.map {
+            HandObservation(id: $0.id, pose: $0.pose, palmSize: $0.features.palmSize, palmCenter: $0.features.palmCenter,
+                            reliable: $0.features.isReliable)
+        }
+        if let newState = engagement.update(hands: observations, at: t, suppressed: suppressed) {
             if case .engaged = newState {} else { events += endGestures() }
             events.append(.engagement(newState))
         }
