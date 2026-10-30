@@ -5,6 +5,8 @@ public enum Action: Codable, Hashable, Sendable {
     case switchSpace(Direction)
     case missionControl
     case appExpose
+    /// Finger-following Dock swipe (Spaces / Mission Control), like three fingers on the trackpad.
+    case dockSwipe
     case none
 }
 
@@ -22,6 +24,8 @@ public struct Bindings: Codable, Equatable, Sendable {
         .swipeRight: .switchSpace(.right),
         .swipeUp: .missionControl,
         .swipeDown: .appExpose,
+        .dockSwipeHorizontal: .dockSwipe,
+        .dockSwipeVertical: .dockSwipe,
     ])
 
     public subscript(_ id: GestureID) -> Action {

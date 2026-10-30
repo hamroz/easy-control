@@ -7,7 +7,14 @@ public struct CGEventSink: EventSink {
 
     public init() {}
 
+    public var supportsDockSwipe: Bool { DockSwipeBridge.shared.isAvailable }
+
     public func post(_ event: SyntheticEvent) {
+        if case let .dockSwipe(motion, phase, progress, velocity) = event {
+            DockSwipeBridge.shared.post(motion: motion, phase: phase, progress: progress, velocity: velocity,
+                                        marker: Self.syntheticMarker)
+            return
+        }
         guard let cgEvent = Self.makeEvent(event) else { return }
         cgEvent.setIntegerValueField(.eventSourceUserData, value: Self.syntheticMarker)
         cgEvent.post(tap: .cghidEventTap)
@@ -27,6 +34,8 @@ public struct CGEventSink: EventSink {
             guard let e = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: down) else { return nil }
             e.flags = CGEventFlags(rawValue: flags)
             return e
+        case .dockSwipe:
+            return nil
         }
     }
 }

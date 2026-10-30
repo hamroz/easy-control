@@ -13,6 +13,7 @@ func usage() -> Never {
     usage: ec-probe space left|right
            ec-probe mission-control | app-expose
            ec-probe scroll-demo [down|up]
+           ec-probe dock-swipe left|right|up|down   (simulated three-finger hand drag)
            ec-probe monitor <seconds>
            ec-probe monitor-selftest
     """)
@@ -56,6 +57,33 @@ case "scroll-demo":
         ticks += 1
     }
     print("scrolled 400 px with \(ticks) momentum ticks")
+
+case "dock-swipe":
+    guard let d = args.dropFirst().first.flatMap(Direction.init(rawValue:)) else { usage() }
+    print("private Dock swipe available: \(sink.supportsDockSwipe)")
+    let injector = DockSwipeInjector(sink: sink, spaces: ControlArrowStrategy(sink: sink))
+    let id: GestureID = d == .left || d == .right ? .dockSwipeHorizontal : .dockSwipeVertical
+    // Hand travel of 0.3 frame heights over 0.4 s: right/up are positive x / negative y in our coordinates.
+    let step: SIMD2<Float> = switch d {
+    case .right: [0.025, 0]
+    case .left: [-0.025, 0]
+    case .up: [0, -0.025]
+    case .down: [0, 0.025]
+    }
+    var t = CACurrentMediaTime()
+    injector.handle(id, phase: .began, delta: step, at: t)
+    for _ in 0..<11 {
+        Thread.sleep(forTimeInterval: 1.0 / 30)
+        t = CACurrentMediaTime()
+        injector.handle(id, phase: .changed, delta: step, at: t)
+    }
+    injector.handle(id, phase: .ended, delta: .zero, at: t)
+    while injector.needsTicks {
+        Thread.sleep(forTimeInterval: 0.05)
+        injector.tick(at: CACurrentMediaTime())
+    }
+    Thread.sleep(forTimeInterval: 0.5)
+    print("posted a \(d.rawValue) hand drag")
 
 case "monitor":
     let seconds = Double(args.dropFirst().first ?? "5") ?? 5
