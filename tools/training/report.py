@@ -49,7 +49,9 @@ def render(m: dict) -> str:
         "the model. Training rows include a chirality-flipped copy of every hand so the model does not depend on "
         "Vision's left/right guess; features are aspect-ratio corrected and include absolute orientation.",
         "",
-        f"Selection criterion: {m['selection']['criterion']} (validation split only).",
+        f"Selection criterion: {m['selection']['criterion']} (validation split only). Note: this sweep was run "
+        "before `pinch` and the personal recordings were added; the chosen configuration was reused, not re-validated "
+        "with 10 classes.",
         "",
         "| Gate | Class-weight power | Hidden | Val acc @ threshold | Val gesture precision | Val none→gesture |",
         "|---|---|---|---|---|---|",
@@ -87,7 +89,8 @@ def _local_section(m: dict) -> list[str]:
         "which the model never saw. Same person, so this measures fit to the user, not generalization; the HaGRID "
         "numbers above exclude every personal row.",
         "",
-        f"Accuracy acting at ≥ {m['threshold']}: **{loc['acted_accuracy']:.1%}**; "
+        f"Accuracy acting at ≥ {m['threshold']}: **{loc['acted_accuracy']:.1%}** (the HaGRID-only model scored "
+        "76.5 % on the same rows, 80.7 % vs 87.0 % excluding `pinch`; see `docs/eval/m3-personal-baseline.json`); "
         f"`none` hands turned into a gesture: {loc['none_false_trigger_rate']:.1%}.",
         "",
         "| Class | Recall | Support |",
