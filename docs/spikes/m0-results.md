@@ -50,3 +50,15 @@ Per class (legacy): fist 15/15, one 14/15, palm 15/15, peace 15/15. Chirality re
 | `ec-probe mission-control` | posted; visual check pending |
 
 Finding: events posted immediately before a process exits can be dropped — `ec-probe` now waits 0.3 s after posting. Not an issue for the long-running app.
+
+## 5. Finger-following Dock swipes (2026-10-30, `tools/spikes/dock_swipe.swift`)
+
+Recipe from Grabby's research notes (MIT, https://github.com/govindup63/grabby, `specs/001-mouse-action-button/research.md`): an `IOHIDEvent` of type 23 (Dock Swipe) with motion / flavor / progress fields and phase in the options (`phase << 24`), attached to a type-30 `CGEvent` with SkyLight's `SLEventSetIOHIDEvent`, posted at the session tap; on end, a child Velocity event (type 9).
+
+| Flavor | Progress sign | Result |
+|---|---|---|
+| 3 | + (0 → 1.2 over 0.5 s) | Space 262 → 7 (one to the **left**, i.e. natural direction: hand right shows the left Space) ✔ |
+| 3 | − | 7 → 262 ✔ |
+| 1 | ± | no change |
+
+**Decision:** flavor 3; progress sign = hand's horizontal travel (natural). All symbols (`IOHIDEventCreate`, `IOHIDEventSetIntegerValue`, `IOHIDEventSetFloatValue`, `IOHIDEventSetEventFlags`, `IOHIDEventAppendEvent`, `SLEventSetIOHIDEvent`) resolve via `dlsym` on macOS 27.0.1. Vertical (Mission Control) motion = 2, to be confirmed visually.
