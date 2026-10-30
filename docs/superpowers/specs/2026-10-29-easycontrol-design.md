@@ -263,3 +263,13 @@ Each milestone ends in something runnable.
 - Custom motion gestures.
 - Linux (and possibly Windows) via a MediaPipe `HandLandmarkSource` and platform-specific `EventSink`s.
 - External / Continuity Camera support as first-class.
+
+## 12. Addendum (2026-10-30): trackpad feel, after the first live session
+
+Findings from the user's recordings (10 min normal use, one ~35 s recording per pose): 0 false actions; left/right swipes needed ~1.8× the hand travel of up/down because the camera is 16:9 and motion was measured in frame fractions; the HaGRID-trained model often misread the user's two-finger, point, three and fist poses.
+
+Decisions (user, 2026-10-30):
+- **Three fingers = the trackpad's three-finger swipe.** Holding the `three` pose and moving drags the Spaces strip (horizontal) or Mission Control / App Exposé (vertical) *with the hand*, using the Dock's own swipe events (private Dock Swipe IOHIDEvent via SkyLight, verified on macOS 27 in `docs/spikes/m0-results.md` §5). Releasing the pose lets the Dock commit or snap back by velocity, as on a trackpad. If the private symbols are unavailable, the gesture falls back to the existing Ctrl+Arrow / Mission Control keys on release. Open-palm quick swipes stay as a secondary gesture.
+- **Re-engagement — both:** after engagement ends because the hand left or went idle, the session waits in **standby for 15 s**; in standby a hand moving *into* a gesture pose (open palm, two, three) resumes instantly, with no hold. From idle, holding two or three fingers for 0.3 s engages directly, as does the 0.4 s open palm.
+- Motion (swipes, scroll, Dock swipes) is measured in aspect-corrected units.
+- The pose model is personalized with the user's recordings (added as an extra subject, evaluated on held-out time segments), which also adds the `pinch` class.
