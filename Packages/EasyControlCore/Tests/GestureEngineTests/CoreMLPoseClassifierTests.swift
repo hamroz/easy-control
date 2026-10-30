@@ -31,8 +31,8 @@ private func loadClassifier() async throws -> CoreMLPoseClassifier {
     let classifier = try await loadClassifier()
     let probs = classifier.classify(HandFeatureExtractor.extract(SyntheticHand.make(.openPalm)))
     #expect(abs(probs.values.reduce(0, +) - 1) < 1e-3)
-    #expect(probs.count >= 9) // a real model output, not the [.none: 1] failure fallback
-    #expect(probs[.pinch] == nil || probs[.pinch] == 0)
+    #expect(probs.count >= 10) // a real model output, not the [.none: 1] failure fallback
+    #expect(probs[.pinch] != nil) // pinch is learned from the user's recordings
 }
 
 @Test func unreliableHandsAreNone() async throws {

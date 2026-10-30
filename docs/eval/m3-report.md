@@ -8,46 +8,75 @@ All numbers count every detected hand, the way the app sees it: hands that fail 
 
 | Metric (test) | Core ML model | Rules (M2) |
 |---|---|---|
-| Accuracy, acting only at ≥ 0.85 | **94.9%** | — |
-| Accuracy, argmax (end to end) | 94.9% | 46.9% |
-| Accuracy, argmax, gated hands only | 96.8% | — |
+| Accuracy, acting only at ≥ 0.85 | **94.3%** | — |
+| Accuracy, argmax (end to end) | 94.4% | 46.9% |
+| Accuracy, argmax, gated hands only | 96.3% | — |
 | Accuracy on the rules' own 6 classes | — | 54.2% |
-| When it acts on a gesture, it is right | 98.1% | — |
-| `none` hands turned into a gesture | 1.5% | — |
+| When it acts on a gesture, it is right | 97.8% | — |
+| `none` hands turned into a gesture | 1.7% | — |
 
-Spec target (≥ 97 % accuracy): judged on **accuracy acting at ≥ 0.85, end to end** — **not met** (94.9%).
+Spec target (≥ 97 % accuracy): judged on **accuracy acting at ≥ 0.85, end to end** — **not met** (94.3%).
 
 ## Recall per class (test, end to end, acting at the threshold)
 
 | Class | Recall | Support |
 |---|---|---|
-| openPalm | 0.963 | 461 |
-| fist | 0.849 | 238 |
-| point | 0.852 | 223 |
-| two | 0.925 | 453 |
-| three | 0.935 | 706 |
-| ok | 0.962 | 238 |
-| thumbsUp | 0.921 | 229 |
-| thumbsDown | 0.870 | 215 |
-| none | 0.985 | 2300 |
+| openPalm | 0.935 | 461 |
+| fist | 0.815 | 238 |
+| point | 0.830 | 223 |
+| two | 0.918 | 453 |
+| three | 0.942 | 706 |
+| ok | 0.933 | 238 |
+| thumbsUp | 0.926 | 229 |
+| thumbsDown | 0.879 | 215 |
+| pinch | — | 0 |
+| none | 0.983 | 2300 |
 
 ## Confusion matrix (test, end to end, acting at the threshold; rows = truth)
 
-| | openPalm | fist | point | two | three | ok | thumbsUp | thumbsDown | none |
-|---|---|---|---|---|---|---|---|---|---|
-| **openPalm** | 444 | 0 | 0 | 0 | 1 | 1 | 0 | 0 | 15 |
-| **fist** | 0 | 202 | 1 | 0 | 0 | 0 | 1 | 0 | 34 |
-| **point** | 0 | 2 | 190 | 1 | 0 | 0 | 0 | 0 | 30 |
-| **two** | 0 | 0 | 1 | 419 | 1 | 1 | 0 | 0 | 31 |
-| **three** | 0 | 0 | 0 | 3 | 660 | 0 | 0 | 0 | 43 |
-| **ok** | 0 | 0 | 0 | 0 | 0 | 229 | 0 | 0 | 9 |
-| **thumbsUp** | 0 | 0 | 0 | 0 | 0 | 0 | 211 | 0 | 18 |
-| **thumbsDown** | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 187 | 28 |
-| **none** | 9 | 2 | 6 | 2 | 1 | 2 | 11 | 2 | 2265 |
+| | openPalm | fist | point | two | three | ok | thumbsUp | thumbsDown | pinch | none |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **openPalm** | 431 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 1 | 28 |
+| **fist** | 0 | 194 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 42 |
+| **point** | 0 | 1 | 185 | 1 | 0 | 0 | 0 | 0 | 0 | 36 |
+| **two** | 0 | 0 | 1 | 416 | 2 | 1 | 0 | 0 | 0 | 33 |
+| **three** | 0 | 0 | 0 | 4 | 665 | 0 | 0 | 0 | 0 | 37 |
+| **ok** | 0 | 0 | 0 | 0 | 0 | 222 | 0 | 0 | 3 | 13 |
+| **thumbsUp** | 0 | 0 | 0 | 0 | 0 | 0 | 212 | 0 | 0 | 17 |
+| **thumbsDown** | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 189 | 0 | 25 |
+| **pinch** | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| **none** | 8 | 5 | 4 | 0 | 4 | 1 | 8 | 8 | 0 | 2262 |
+
+## Your hand (personalization)
+
+The user's own recordings were added to training (10940 rows incl. flipped copies, counted ×10) and evaluated on the **last 25 % of each recording** (2276 hands), which the model never saw. Same person, so this measures fit to the user, not generalization; the HaGRID numbers above exclude every personal row.
+
+Accuracy acting at ≥ 0.85: **84.9%**; `none` hands turned into a gesture: 0.4%.
+
+| Class | Recall | Support |
+|---|---|---|
+| openPalm | 0.779 | 140 |
+| fist | 0.417 | 127 |
+| point | 0.624 | 149 |
+| two | 0.578 | 135 |
+| three | 0.808 | 146 |
+| ok | 0.975 | 122 |
+| thumbsUp | 0.808 | 104 |
+| thumbsDown | 0.939 | 98 |
+| pinch | 0.471 | 121 |
+| none | 0.996 | 1134 |
+
+How much the personal rows count was chosen on each recording's validation slice (the 15 % before the test part), keeping HaGRID validation gesture precision within 0.5 pt of weight 1:
+
+| Personal weight | Your val accuracy @ threshold | HaGRID val gesture precision |
+|---|---|---|
+| ×1 | 0.8346 | 0.9768 |
+| ×3 | 0.8395 | 0.9766 |
+| ×10 | 0.8486 | 0.9753 |
 
 ## Model and selection
 
-Chosen: gate `reliable`, class-weight power 0.5, MLP 55→256→128→9 (dropout 0.2, AdamW lr 1e-3, early stopping on validation; best epoch 55). Standardization is folded into the model. Training rows include a chirality-flipped copy of every hand so the model does not depend on Vision's left/right guess; features are aspect-ratio corrected and include absolute orientation.
+Chosen: gate `reliable`, class-weight power 0.5, MLP 55→256→128→10 (dropout 0.2, AdamW lr 1e-3, early stopping on validation; best epoch 41). Standardization is folded into the model. Training rows include a chirality-flipped copy of every hand so the model does not depend on Vision's left/right guess; features are aspect-ratio corrected and include absolute orientation.
 
 Selection criterion: highest validation accuracy at the app threshold, gated rows counted as none (validation split only).
 

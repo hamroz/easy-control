@@ -4,8 +4,8 @@ import pathlib
 
 import numpy as np
 
-# Same order and raw values as Swift `PoseClass` (pinch excluded: no training data yet).
-CLASSES = ["openPalm", "fist", "point", "two", "three", "ok", "thumbsUp", "thumbsDown", "none"]
+# Raw values of Swift `PoseClass`. `pinch` comes only from the user's own recordings (HaGRID has none).
+CLASSES = ["openPalm", "fist", "point", "two", "three", "ok", "thumbsUp", "thumbsDown", "pinch", "none"]
 # Must equal Swift `HandFeatures.vectorLength`.
 N_FEATURES = 55
 
@@ -18,22 +18,27 @@ def passes_gate(row: dict, gate: str) -> bool:
     return bool(row["reliable"] and (gate == "reliable" or row["known"]))
 
 
-def load(path: str | pathlib.Path, gate: str = "reliable", augmented: bool = False) -> tuple[np.ndarray, np.ndarray, list[dict]]:
-    """Returns features, class indices and per-row metadata for rows passing `gate`. Chirality-flipped
-    augmentation rows are included only when `augmented` is true (training)."""
+LOCAL_USER = "local-user"
+
+
+def load(path: str | pathlib.Path | list, gate: str = "reliable", augmented: bool = False) -> tuple[np.ndarray, np.ndarray, list[dict]]:
+    """Returns features, class indices and per-row metadata for rows passing `gate`, from one file or a list.
+    Chirality-flipped augmentation rows are included only when `augmented` is true (training)."""
     X, y, meta = [], [], []
-    with open(path) as f:
-        for line in f:
-            if not line.strip():
-                continue
-            row = json.loads(line)
-            if row.get("augmented", False) and not augmented:
-                continue
-            if not passes_gate(row, gate) or row["label"] not in CLASSES:
-                continue
-            X.append(row["vector"])
-            y.append(CLASSES.index(row["label"]))
-            meta.append({k: v for k, v in row.items() if k != "vector"})
+    paths = [pathlib.Path(p) for p in (path if isinstance(path, list) else [path])]
+    for p in (p for p in paths if p.exists()):
+        with open(p) as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                row = json.loads(line)
+                if row.get("augmented", False) and not augmented:
+                    continue
+                if not passes_gate(row, gate) or row["label"] not in CLASSES:
+                    continue
+                X.append(row["vector"])
+                y.append(CLASSES.index(row["label"]))
+                meta.append({k: v for k, v in row.items() if k != "vector"})
     return np.asarray(X, dtype=np.float32).reshape(-1, N_FEATURES), np.asarray(y, dtype=np.int64), meta
 
 
