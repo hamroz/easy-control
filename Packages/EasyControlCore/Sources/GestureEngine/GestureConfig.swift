@@ -29,6 +29,12 @@ public struct GestureConfig: Sendable {
     public var scrollDeadZone: Float = 0.004
     /// Three-finger drag: travel (frame heights) before the drag commits to horizontal or vertical.
     public var dockSwipeLock: Float = 0.03
+    /// A running scroll / three-finger drag rides through this much missing or uncertain tracking.
+    public var continuousGrace: Double = 0.2
+    /// …and ends only after a different confident pose lasts this many frames.
+    public var continuousReleaseFrames = 3
+    /// After a scroll or drag ends, no other gesture may start for this long (exclusive lock + settle).
+    public var continuousSettle: Double = 0.2
 
     public init() {}
 

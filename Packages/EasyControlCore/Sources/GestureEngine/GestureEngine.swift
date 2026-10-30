@@ -31,6 +31,8 @@ public final class GestureEngine {
     private var scroll: ScrollRecognizer
     private var swipe: SwipeRecognizer
     private var dock: DockSwipeRecognizer
+    /// Exclusive lock: after a scroll or drag ends, nothing else starts until then.
+    private var settleUntil: Double = -.infinity
     public private(set) var snapshot = EngineSnapshot()
 
     public init(config: GestureConfig = .default, classifier: any PoseClassifying = RuleBasedPoseClassifier()) {
@@ -80,9 +82,19 @@ public final class GestureEngine {
             let reliable = hand?.features.isReliable == true
             let center = reliable ? hand?.features.palmCenter : nil
             let aspect = hand?.hand.aspectRatio ?? 1
-            if let e = scroll.update(pose: pose, palmCenter: center, aspect: aspect, at: t) { events.append(e) }
-            if let e = dock.update(pose: pose, palmCenter: center, aspect: aspect, at: t) { events.append(e) }
-            if scroll.isActive || dock.isActive {
+            // A running continuous gesture owns the hand; a new one may start only when none is running
+            // and the previous one has settled, so a misread pose can't hand a scroll over to a Space swipe.
+            let settled = t >= settleUntil
+            let scrollPose = scroll.isActive || (settled && !dock.isActive) ? pose : .none
+            let dockPose = dock.isActive || (settled && !scroll.isActive) ? pose : .none
+            for e in [scroll.update(pose: scrollPose, palmCenter: center, aspect: aspect, at: t),
+                      dock.update(pose: dockPose, palmCenter: center, aspect: aspect, at: t)].compactMap({ $0 }) {
+                events.append(e)
+                if case .continuous(_, let phase, _) = e, phase == .ended || phase == .cancelled {
+                    settleUntil = t + config.continuousSettle
+                }
+            }
+            if scroll.isActive || dock.isActive || t < settleUntil {
                 swipe.reset()
             } else if let e = swipe.update(pose: pose, palmCenter: reliable ? hand?.rawPalmCenter : nil, aspect: aspect, at: t) {
                 events.append(e)

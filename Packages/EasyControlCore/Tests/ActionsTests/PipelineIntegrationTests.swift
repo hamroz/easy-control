@@ -39,7 +39,7 @@ private func flickScript() -> FrameScript {
 @Test func releasedFlickCoastsWithMomentum() {
     let rig = Rig()
     var s = flickScript()
-    s.hold(.openPalm, at: [0.5, 0.7], for: 0.2)
+    s.move(.openPalm, from: [0.5, 0.7], to: [0.5, 0.9], over: 0.2) // flick: the hand keeps moving as the pose opens
     rig.play(s.frames)
     rig.tick(from: s.now)
     #expect(!rig.momentumEvents.isEmpty)
@@ -68,7 +68,7 @@ private func flickScript() -> FrameScript {
 @Test func userInputStopsRunningMomentum() {
     let rig = Rig()
     var s = flickScript()
-    s.hold(.openPalm, at: [0.5, 0.7], for: 0.2)
+    s.move(.openPalm, from: [0.5, 0.7], to: [0.5, 0.9], over: 0.2)
     rig.play(s.frames)
     rig.tick(from: s.now, count: 3)
     #expect(rig.dispatcher.isMomentumActive)
