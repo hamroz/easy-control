@@ -50,6 +50,14 @@ Open **Debug Window…** from the menu-bar hand icon for every step below.
 - [ ] Lock screen (⌃⌘Q) → camera light off; unlock → tracking resumes.
 - [ ] Close the lid / sleep → resumes after wake.
 
+## 6b. Trackpad feel (M3.5)
+- [ ] Three fingers up, drag left/right slowly: the Spaces strip follows your hand; release (change pose) past halfway → it commits; release early → it snaps back.
+- [ ] Quick three-finger flick left/right: commits by velocity, like a trackpad.
+- [ ] Three fingers drag **up**: Mission Control follows and opens. If up/down are inverted, note it (vertical sign is a constant in `DockSwipeInjector`).
+- [ ] Left/right open-palm swipes now work as easily as up/down (16:9 fix).
+- [ ] Move the hand out of view for 5 s, bring it back with two fingers: scrolling works immediately (standby). After 20 s away, an open palm hold (or two/three fingers for 0.3 s) is needed.
+- [ ] Hold a palm still for 10 s: no flicker between engaged and standby.
+
 ## 7. Learned classifier (M3)
 - [ ] Debug panel shows `Classifier: coreml` (not `rules`).
 - [ ] Hold each pose for a few seconds — open palm, fist, point (index up), two (V), three, OK, thumbs up, thumbs down — and note any the panel misreads: ____
