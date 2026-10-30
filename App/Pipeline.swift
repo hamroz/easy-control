@@ -180,14 +180,14 @@ final class Pipeline: @unchecked Sendable {
     }
 
     private func updateMomentumTimer() {
-        if dispatcher.isMomentumActive, momentumTimer == nil {
+        if dispatcher.needsTicks, momentumTimer == nil {
             let timer = DispatchSource.makeTimerSource(queue: camera.queue)
             timer.schedule(deadline: .now(), repeating: 1.0 / 60)
             timer.setEventHandler { [weak self] in
                 guard let self else { return }
                 stopMomentumOnUserInput()
                 dispatcher.tick(at: CACurrentMediaTime())
-                if !dispatcher.isMomentumActive { stopMomentumTimer() }
+                if !dispatcher.needsTicks { stopMomentumTimer() }
             }
             timer.resume()
             momentumTimer = timer
