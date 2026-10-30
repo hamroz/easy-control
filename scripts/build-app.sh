@@ -16,7 +16,7 @@ if [[ -n "$IDENTITY" ]]; then
   SIGN_ARGS=(CODE_SIGN_IDENTITY="$IDENTITY" DEVELOPMENT_TEAM="$TEAM")
   echo "Signing with: $IDENTITY"
 else
-  echo "No Apple Development identity: ad-hoc signing (permissions reset on every rebuild)"
+  echo "No Apple Development identity: ad-hoc signing pinned to the bundle id (permissions persist across rebuilds)"
 fi
 
 xcodebuild -project EasyControl.xcodeproj -scheme EasyControl -configuration "$CONFIG" \
