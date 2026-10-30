@@ -11,10 +11,18 @@ public final class DockSwipeInjector {
     private let handTravelPerSpace: Float
     private static let resendDelays = [0.2, 0.5]
     private static let fallbackThreshold = 0.5
+    /// Release velocity is measured over this window, so one jittery frame can't decide the outcome.
+    private static let velocityWindow = 0.1
+    /// Below this (progress per second) the hand counts as stopped: the Dock decides from position alone.
+    private static let velocityDeadZone = 0.3
+    /// Moving back at least this fast (progress per second) on release snaps the Dock back.
+    private static let reverseThreshold = 1.0
+    /// The Dock's velocity field expects a per-event delta ×100; our events arrive at ~30 Hz.
+    private static let velocityScale = 100.0 / 30.0
 
     private var motion: DockMotion?
     private var progress = 0.0
-    private var lastDelta = 0.0
+    private var recent: [(t: Double, step: Double)] = []
     private var resends: [(at: Double, event: SyntheticEvent)] = []
 
     public init(sink: any EventSink, spaces: any SpaceSwitchStrategy, handTravelPerSpace: Float = 0.25) {
@@ -33,16 +41,19 @@ public final class DockSwipeInjector {
         let step = Double(axis == .horizontal ? delta.x : -delta.y) / Double(handTravelPerSpace)
         switch phase {
         case .began:
+            resends.removeAll() // the previous swipe's safety re-sends must not land inside this one
             motion = axis
             progress = 0
+            recent.removeAll()
             post(.began)
-            if step != 0 { apply(step) }
+            if step != 0 { apply(step, at: t) }
         case .changed:
             guard motion != nil else { return }
-            apply(step)
+            apply(step, at: t)
         case .ended:
             guard motion != nil else { return }
-            let reversed = progress != 0 && lastDelta != 0 && (lastDelta > 0) != (progress > 0)
+            let v = velocity(at: t)
+            let reversed = progress != 0 && v * progress < 0 && abs(v) >= Self.reverseThreshold
             finish(reversed ? .cancelled : .ended, at: t)
         case .cancelled:
             guard motion != nil else { return }
@@ -61,10 +72,17 @@ public final class DockSwipeInjector {
         due.forEach { sink.post($0.event) }
     }
 
-    private func apply(_ step: Double) {
+    private func apply(_ step: Double, at t: Double) {
         progress += step
-        lastDelta = step
+        recent.append((t, step))
+        recent.removeAll { t - $0.t > Self.velocityWindow }
         post(.changed)
+    }
+
+    /// Progress per second over the last `velocityWindow`, zero inside the dead zone.
+    private func velocity(at t: Double) -> Double {
+        let v = recent.filter { t - $0.t < Self.velocityWindow - 1e-6 }.reduce(0) { $0 + $1.step } / Self.velocityWindow
+        return abs(v) < Self.velocityDeadZone ? 0 : v
     }
 
     private func post(_ phase: DockPhase, velocity: Double = 0) {
@@ -75,7 +93,8 @@ public final class DockSwipeInjector {
     private func finish(_ phase: DockPhase, at t: Double) {
         guard let axis = motion else { return }
         if sink.supportsDockSwipe {
-            let event = SyntheticEvent.dockSwipe(motion: axis, phase: phase, progress: progress, velocity: lastDelta * 100)
+            let event = SyntheticEvent.dockSwipe(motion: axis, phase: phase, progress: progress,
+                                                 velocity: phase == .ended ? velocity(at: t) * Self.velocityScale : 0)
             sink.post(event)
             resends += Self.resendDelays.map { (t + $0, event) }
         } else if phase == .ended, abs(progress) >= Self.fallbackThreshold {
@@ -88,6 +107,6 @@ public final class DockSwipeInjector {
         }
         motion = nil
         progress = 0
-        lastDelta = 0
+        recent.removeAll()
     }
 }

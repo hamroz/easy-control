@@ -35,15 +35,8 @@ private func injector(supported: Bool = true) -> (DockSwipeInjector, RecordingEv
     d.handle(.dockSwipeHorizontal, phase: .changed, delta: [0.05, 0], at: 0.033)
     d.handle(.dockSwipeHorizontal, phase: .ended, delta: .zero, at: 0.066)
     let end = sink.events.compactMap(dock).last!
-    #expect(end.1 == .ended && abs(end.2 - 0.4) < 1e-6 && abs(end.3 - 20) < 1e-6)
-}
-
-@Test func reversalBecomesCancelled() {
-    let (d, sink) = injector()
-    d.handle(.dockSwipeHorizontal, phase: .began, delta: [0.1, 0], at: 0)
-    d.handle(.dockSwipeHorizontal, phase: .changed, delta: [-0.02, 0], at: 0.033)
-    d.handle(.dockSwipeHorizontal, phase: .ended, delta: .zero, at: 0.066)
-    #expect(sink.events.compactMap(dock).last!.1 == .cancelled)
+    // 0.4 progress over the last 0.1 s = 4 progress/s, sent in the Dock's per-frame×100 units at 30 fps.
+    #expect(end.1 == .ended && abs(end.2 - 0.4) < 1e-6 && abs(end.3 - 4.0 * 100 / 30) < 1e-6)
 }
 
 @Test func endIsResent() {
@@ -85,4 +78,44 @@ private func injector(supported: Bool = true) -> (DockSwipeInjector, RecordingEv
     dispatcher.handle([.continuous(.dockSwipeHorizontal, phase: .began, delta: [0.05, 0])], at: 0)
     dispatcher.cancelMomentum()
     #expect(sink.events.compactMap(dock).last?.1 == .cancelled)
+}
+
+@Test func newSwipeDropsPendingResends() {
+    let (d, sink) = injector()
+    d.handle(.dockSwipeHorizontal, phase: .began, delta: [0.1, 0], at: 0)
+    d.handle(.dockSwipeHorizontal, phase: .ended, delta: .zero, at: 0.1)
+    d.handle(.dockSwipeHorizontal, phase: .began, delta: [0.02, 0], at: 0.25)
+    let before = sink.events.count
+    d.tick(at: 0.35) // the first swipe's +0.2 s re-send would be due now
+    d.tick(at: 0.65)
+    #expect(sink.events.count == before)
+}
+
+@Test func pausedReleasePastHalfwayCommits() {
+    let (d, sink) = injector()
+    var t = 0.0
+    d.handle(.dockSwipeHorizontal, phase: .began, delta: [0.05, 0], at: t)
+    for _ in 0..<3 { t += 1.0 / 30; d.handle(.dockSwipeHorizontal, phase: .changed, delta: [0.03, 0], at: t) }
+    for i in 0..<9 { t += 1.0 / 30; d.handle(.dockSwipeHorizontal, phase: .changed, delta: [i % 2 == 0 ? -0.001 : 0.001, 0], at: t) }
+    d.handle(.dockSwipeHorizontal, phase: .ended, delta: .zero, at: t)
+    let end = sink.events.compactMap(dock).last!
+    #expect(end.1 == .ended)           // jitter while pausing must not turn the release into a snap-back
+    #expect(abs(end.3) < 1)            // and a paused hand releases with ~no velocity
+}
+
+@Test func staleVelocityIsNotSentAfterPause() {
+    let (d, sink) = injector()
+    d.handle(.dockSwipeHorizontal, phase: .began, delta: [0.05, 0], at: 0)
+    d.handle(.dockSwipeHorizontal, phase: .changed, delta: [0.05, 0], at: 0.033)
+    d.handle(.dockSwipeHorizontal, phase: .ended, delta: .zero, at: 0.5) // hand held still, then released
+    #expect(abs(sink.events.compactMap(dock).last!.3) < 1)
+}
+
+@Test func fastReverseFlickCancels() {
+    let (d, sink) = injector()
+    var t = 0.0
+    d.handle(.dockSwipeHorizontal, phase: .began, delta: [0.1, 0], at: t)          // progress 0.4
+    for _ in 0..<3 { t += 1.0 / 30; d.handle(.dockSwipeHorizontal, phase: .changed, delta: [-0.02, 0], at: t) } // still +0.16, moving back fast
+    d.handle(.dockSwipeHorizontal, phase: .ended, delta: .zero, at: t)
+    #expect(sink.events.compactMap(dock).last!.1 == .cancelled)
 }
