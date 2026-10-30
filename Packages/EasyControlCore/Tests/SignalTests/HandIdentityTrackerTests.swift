@@ -57,3 +57,15 @@ import TestSupport
     }
     #expect(ids == [first])
 }
+
+@Test func smoothedHandKeepsMajorityChirality() {
+    // Vision's left/right guess flickers for single frames; the hand handed to the classifier must not.
+    let tracker = HandIdentityTracker()
+    var seen: [Chirality] = []
+    for i in 0..<20 {
+        let flicker = i % 7 == 6
+        let hand = SyntheticHand.make(.openPalm, chirality: flicker ? .left : .right)
+        seen += tracker.update(HandFrame(timestamp: Double(i) / 30, hands: [hand])).map(\.hand.chirality)
+    }
+    #expect(seen.allSatisfy { $0 == .right })
+}

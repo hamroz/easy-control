@@ -17,6 +17,9 @@ public struct HandFeatures: Sendable, Equatable {
     public var palmSize: Float
     public var isReliable: Bool
 
+    /// Length of `vector`; the Core ML model's input must match it.
+    public static let vectorLength = 52
+
     /// 42 normalized coordinates + 5 extension flags (0/1) + 5 bend angles.
     public var vector: [Float] {
         normalized.flatMap { [$0.x, $0.y] } + fingerExtended.map { $0 ? 1 : 0 } + bendAngles

@@ -31,6 +31,7 @@ private func loadClassifier() async throws -> CoreMLPoseClassifier {
     let classifier = try await loadClassifier()
     let probs = classifier.classify(HandFeatureExtractor.extract(SyntheticHand.make(.openPalm)))
     #expect(abs(probs.values.reduce(0, +) - 1) < 1e-3)
+    #expect(probs.count >= 9) // a real model output, not the [.none: 1] failure fallback
     #expect(probs[.pinch] == nil || probs[.pinch] == 0)
 }
 
@@ -39,6 +40,13 @@ private func loadClassifier() async throws -> CoreMLPoseClassifier {
     var hand = SyntheticHand.make(.two)
     hand[.indexTip].confidence = 0.05
     #expect(classifier.classify(HandFeatureExtractor.extract(hand)) == [.none: 1])
+}
+
+@Test func modelWithWrongInputLengthIsRejected() async throws {
+    let compiled = try await CoreMLPoseClassifier.compile(packageURL)
+    #expect(throws: (any Error).self) {
+        _ = try CoreMLPoseClassifier(compiledModelURL: compiled, expectedInputLength: HandFeatures.vectorLength + 1)
+    }
 }
 
 @Test func loadingMissingModelThrows() {

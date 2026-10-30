@@ -14,7 +14,9 @@ public struct TrackedHand: Sendable {
 public final class HandIdentityTracker {
     private struct Track {
         var id: HandID
+        /// Majority of the recent left/right guesses; Vision's per-frame guess can flicker.
         var chirality: Chirality
+        var recentChirality: [Chirality] = []
         var center: SIMD2<Float>
         var lastSeen: Double
         var firstSeen: Double
@@ -31,6 +33,7 @@ public final class HandIdentityTracker {
     private static let maxMatchRadius: Float = 0.4
     /// Vision's left/right guess can flicker, so a mismatch only makes a match less likely.
     private static let chiralityMismatchPenalty: Float = 0.1
+    private static let chiralityWindow = 9
     private var tracks: [Track] = []
     private var nextID: HandID = 1
 
@@ -88,7 +91,14 @@ public final class HandIdentityTracker {
             }
             tracks[k].center = centers[h]
             tracks[k].lastSeen = t
-            if hand.chirality != .unknown { tracks[k].chirality = hand.chirality }
+            if hand.chirality != .unknown {
+                tracks[k].recentChirality.append(hand.chirality)
+                if tracks[k].recentChirality.count > Self.chiralityWindow { tracks[k].recentChirality.removeFirst() }
+                let rights = tracks[k].recentChirality.filter { $0 == .right }.count
+                let lefts = tracks[k].recentChirality.count - rights
+                if rights != lefts { tracks[k].chirality = rights > lefts ? .right : .left }
+            }
+            smoothed.chirality = tracks[k].chirality
             result.append(TrackedHand(id: tracks[k].id, hand: smoothed, raw: hand, firstSeen: tracks[k].firstSeen))
         }
         return result
