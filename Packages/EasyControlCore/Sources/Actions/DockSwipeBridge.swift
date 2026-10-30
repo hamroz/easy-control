@@ -55,6 +55,8 @@ final class DockSwipeBridge: @unchecked Sendable {
     func post(motion: DockMotion, phase: DockPhase, progress: Double, velocity: Double, marker: Int64) {
         guard let create, let setInt, let setFloat, let setFlags, let append, let attach,
               let event = create(nil, Self.dockSwipeType, 0, 0) else { return }
+        // IOHIDEventCreate returns a +1 reference; the CGEvent doesn't take ownership, so release it ourselves.
+        defer { Self.release(event) }
         setFlags(event, phase.rawValue << 24)
         setInt(event, Self.motionField, motion.rawValue)
         setInt(event, Self.flavorField, Self.dockPrimaryFlavor)
@@ -62,12 +64,17 @@ final class DockSwipeBridge: @unchecked Sendable {
         if phase == .ended || phase == .cancelled, let v = create(nil, Self.velocityType, 0, 0) {
             setFloat(v, Self.velocityType << 16, velocity)
             setFloat(v, (Self.velocityType << 16) | 1, velocity)
-            append(event, v, 0)
+            append(event, v, 0) // the parent retains its child
+            Self.release(v)
         }
         guard let cg = CGEvent(source: nil), let type = CGEventType(rawValue: Self.gestureEventType) else { return }
         cg.type = type
         attach(cg, event)
         cg.setIntegerValueField(.eventSourceUserData, value: marker)
         cg.post(tap: .cgSessionEventTap)
+    }
+
+    private static func release(_ event: HIDEvent) {
+        Unmanaged<AnyObject>.fromOpaque(UnsafeRawPointer(event)).release()
     }
 }
