@@ -8,6 +8,10 @@ public struct GestureConfig: Sendable {
     public var directEngageHold: Double = 0.3
     /// After engagement ends (hand left or went idle), any move into a gesture pose resumes it instantly.
     public var standbyDuration: Double = 15
+    /// In standby, a gesture pose must be held this long to resume…
+    public var resumeHold: Double = 0.15
+    /// …by a hand that changed pose: to another gesture, or relaxed for at least this long.
+    public var resumeRelax: Double = 0.2
     public var idleTimeout: Double = 3.0
     public var handLostTimeout: Double = 1.0
     public var inputSuppression: Double = 0.5

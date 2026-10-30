@@ -1,8 +1,8 @@
 import Testing
 @testable import GestureEngine
 
-private func obs(_ pose: PoseClass, id: Int = 1, size: Float = 0.12) -> HandObservation {
-    HandObservation(id: id, pose: pose, palmSize: size, palmCenter: [0.5, 0.5])
+private func obs(_ pose: PoseClass, id: Int = 1, size: Float = 0.12, reliable: Bool = true) -> HandObservation {
+    HandObservation(id: id, pose: pose, palmSize: size, palmCenter: [0.5, 0.5], reliable: reliable)
 }
 
 /// Feeds `hands` at 30 fps from `start` for `seconds`; returns the controller state afterwards and the end time.
@@ -65,7 +65,9 @@ private func feed(_ c: inout EngagementController, _ hands: [HandObservation], f
     #expect(c.state == .standby)
     t = feed(&c, [obs(.none, id: 2)], from: t, for: 2.0 / 30) // returning hand, pose not yet stable
     #expect(c.state == .standby)
-    _ = c.update(hands: [obs(.openPalm, id: 2)], at: t)        // first gesture frame: no hold needed
+    t = feed(&c, [obs(.openPalm, id: 2)], from: t, for: 0.1)  // a brief gesture isn't enough…
+    #expect(c.state == .standby)
+    feed(&c, [obs(.openPalm, id: 2)], from: t, for: 0.1)      // …0.15 s of it is, with no palm-hold wake
     #expect(c.state == .engaged(hand: 2, mode: .command))
 }
 
@@ -74,7 +76,7 @@ private func feed(_ c: inout EngagementController, _ hands: [HandObservation], f
     var t = feed(&c, [obs(.openPalm)], from: 0, for: 0.5)
     t = feed(&c, [obs(.openPalm)], from: t, for: 3.2) // idle → standby, palm still raised
     #expect(c.state == .standby)
-    _ = c.update(hands: [obs(.two)], at: t)
+    feed(&c, [obs(.two)], from: t, for: 0.2)
     #expect(c.state == .engaged(hand: 1, mode: .command))
 }
 
@@ -85,6 +87,48 @@ private func feed(_ c: inout EngagementController, _ hands: [HandObservation], f
         if let s = c.update(hands: [obs(.openPalm)], at: Double(i) / 30) { changes.append(s) }
     }
     #expect(changes == [.engaged(hand: 1, mode: .command), .standby, .idle])
+}
+
+@Test func stillPalmWithNoisyFramesDoesNotResume() {
+    var c = EngagementController(config: .default)
+    var changes: [EngagementState] = []
+    for i in 0..<(30 * 25) {
+        // One masked (unreliable) frame every 4 s, and one frame where the stabilizer briefly says none.
+        let dip = i % 120 == 60, glitch = i % 120 == 90
+        let hand = obs(glitch ? .none : .openPalm, reliable: !dip)
+        if let s = c.update(hands: [hand], at: Double(i) / 30) { changes.append(s) }
+    }
+    #expect(changes == [.engaged(hand: 1, mode: .command), .standby, .idle])
+}
+
+@Test func relaxThenRaiseResumes() {
+    var c = EngagementController(config: .default)
+    var t = feed(&c, [obs(.openPalm)], from: 0, for: 0.5)
+    t = feed(&c, [obs(.openPalm)], from: t, for: 3.2)
+    #expect(c.state == .standby)
+    t = feed(&c, [obs(.fist)], from: t, for: 0.3)
+    feed(&c, [obs(.openPalm)], from: t, for: 0.2)
+    #expect(c.state == .engaged(hand: 1, mode: .command))
+}
+
+@Test func typingBlocksResumeFromStandby() {
+    var c = EngagementController(config: .default)
+    var t = feed(&c, [obs(.openPalm)], from: 0, for: 0.5)
+    t = feed(&c, [], from: t, for: 1.2)
+    #expect(c.state == .standby)
+    for i in 0..<30 { _ = c.update(hands: [obs(.two, id: 4)], at: t + Double(i) / 30, suppressed: true) }
+    #expect(c.state == .standby)
+    t += 1
+    _ = c.update(hands: [obs(.two, id: 4)], at: t) // typing just stopped: the hold starts now
+    #expect(c.state == .standby)
+    feed(&c, [obs(.two, id: 4)], from: t + 1.0 / 30, for: 0.2)
+    #expect(c.state == .engaged(hand: 4, mode: .command))
+}
+
+@Test func typingBlocksWakeFromIdle() {
+    var c = EngagementController(config: .default)
+    for i in 0..<30 { _ = c.update(hands: [obs(.openPalm)], at: Double(i) / 30, suppressed: true) }
+    #expect(c.state == .idle)
 }
 
 @Test func standbyExpiresToIdle() {
