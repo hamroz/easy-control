@@ -108,3 +108,27 @@ private func runSwipe(_ samples: [Sample]) -> [GestureEvent] {
     let back = thenHold(linear(.openPalm, from: [0.45, 0.5], to: [0.7, 0.5], over: 0.2, start: swipe.last!.t + 1.0 / 30))
     #expect(runSwipe(swipe + back) == [.discrete(.swipeLeft)])
 }
+
+@Test func wideFrameHorizontalSwipeFires() {
+    // 16:9 camera: 0.14 of the frame width is 0.25 frame heights of real hand travel.
+    var r = SwipeRecognizer(config: .default)
+    let samples = thenHold(linear(.openPalm, from: [0.6, 0.5], to: [0.46, 0.5], over: 0.2, start: 0))
+    let events = samples.compactMap { r.update(pose: $0.pose, palmCenter: $0.center, aspect: 16.0 / 9.0, at: $0.t) }
+    #expect(events == [.discrete(.swipeLeft)])
+}
+
+@Test func wideFrameEdgeStillNormalized() {
+    var r = SwipeRecognizer(config: .default)
+    let samples = thenHold(linear(.openPalm, from: [0.8, 0.5], to: [0.95, 0.5], over: 0.15, start: 0))
+    #expect(samples.compactMap { r.update(pose: $0.pose, palmCenter: $0.center, aspect: 16.0 / 9.0, at: $0.t) }.isEmpty)
+}
+
+@Test func scrollDeltaIsIsotropic() {
+    var r = ScrollRecognizer(config: .default)
+    _ = r.update(pose: .two, palmCenter: [0.5, 0.5], aspect: 2, at: 0)
+    guard case .continuous(.scroll, .changed, let d)? = r.update(pose: .two, palmCenter: [0.51, 0.5], aspect: 2, at: 1.0 / 30) else {
+        Issue.record("expected a scroll change")
+        return
+    }
+    #expect(abs(d.x - 0.02) < 1e-5 && d.y == 0)
+}

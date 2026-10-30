@@ -26,17 +26,22 @@ public struct SwipeRecognizer {
         pending = nil
     }
 
-    public mutating func update(pose: PoseClass, palmCenter: SIMD2<Float>?, at t: Double) -> GestureEvent? {
-        guard pose == .openPalm, let p = palmCenter, t >= cooldownUntil else {
+    /// - Parameters:
+    ///   - palmCenter: normalized frame coordinates (edge checks use these).
+    ///   - aspect: frame width / height; distances and speeds are measured in isotropic units (frame heights),
+    ///     so a horizontal swipe in a 16:9 frame needs the same hand travel as a vertical one.
+    public mutating func update(pose: PoseClass, palmCenter: SIMD2<Float>?, aspect: Float = 1, at t: Double) -> GestureEvent? {
+        guard pose == .openPalm, let normalized = palmCenter, t >= cooldownUntil else {
             reset()
             return nil
         }
+        let p = SIMD2<Float>(normalized.x * aspect, normalized.y)
         if let last = samples.last, t - last.t > config.frameGapReset || t <= last.t { reset() }
         let previous = samples.last
         samples.append((t, p))
         samples.removeAll { t - $0.t > config.swipeWindow + 1e-9 }
 
-        if pending != nil { return settle(p, previous: previous, at: t) }
+        if pending != nil { return settle(p, normalized: normalized, previous: previous, at: t) }
         guard let direction = detectStroke(to: p, at: t) else { return nil }
         if let lock = lockedOut, lock.direction == direction, t < lock.until { return nil }
         pending = Pending(direction: direction, detectedAt: t)
@@ -54,10 +59,11 @@ public struct SwipeRecognizer {
         return d.y < 0 ? .swipeUp : .swipeDown
     }
 
-    private mutating func settle(_ p: SIMD2<Float>, previous: (t: Double, p: SIMD2<Float>)?, at t: Double) -> GestureEvent? {
+    private mutating func settle(_ p: SIMD2<Float>, normalized: SIMD2<Float>, previous: (t: Double, p: SIMD2<Float>)?,
+                                 at t: Double) -> GestureEvent? {
         guard var stroke = pending else { return nil }
         let m = config.swipeEdgeMargin
-        let atEdge = p.x < m || p.x > 1 - m || p.y < m || p.y > 1 - m
+        let atEdge = normalized.x < m || normalized.x > 1 - m || normalized.y < m || normalized.y > 1 - m
         if atEdge || t - stroke.detectedAt > config.swipeSettleTimeout {
             reset()
             return nil

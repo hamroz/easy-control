@@ -77,10 +77,11 @@ public final class GestureEngine {
             let pose = hand?.pose ?? .none
             let reliable = hand?.features.isReliable == true
             let center = reliable ? hand?.features.palmCenter : nil
-            if let e = scroll.update(pose: pose, palmCenter: center, at: t) { events.append(e) }
+            let aspect = hand?.hand.aspectRatio ?? 1
+            if let e = scroll.update(pose: pose, palmCenter: center, aspect: aspect, at: t) { events.append(e) }
             if scroll.isActive {
                 swipe.reset()
-            } else if let e = swipe.update(pose: pose, palmCenter: reliable ? hand?.rawPalmCenter : nil, at: t) {
+            } else if let e = swipe.update(pose: pose, palmCenter: reliable ? hand?.rawPalmCenter : nil, aspect: aspect, at: t) {
                 events.append(e)
             }
             if events.contains(where: Self.isActivity) { engagement.noteActivity(at: t) }

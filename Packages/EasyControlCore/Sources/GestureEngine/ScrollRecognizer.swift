@@ -10,8 +10,12 @@ public struct ScrollRecognizer {
 
     public var isActive: Bool { reference != nil }
 
-    public mutating func update(pose: PoseClass, palmCenter: SIMD2<Float>?, at t: Double) -> GestureEvent? {
-        guard let center = palmCenter else { return cancel() }
+    /// - Parameters:
+    ///   - palmCenter: normalized frame coordinates.
+    ///   - aspect: frame width / height; deltas are reported in isotropic units (frame heights).
+    public mutating func update(pose: PoseClass, palmCenter: SIMD2<Float>?, aspect: Float = 1, at t: Double) -> GestureEvent? {
+        guard let normalized = palmCenter else { return cancel() }
+        let center = SIMD2<Float>(normalized.x * aspect, normalized.y)
         guard pose == .two else { return release() }
         guard let ref = reference else {
             reference = center
