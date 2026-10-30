@@ -9,6 +9,10 @@ public struct GestureID: RawRepresentable, Hashable, Codable, Sendable, CustomSt
     public static let swipeRight = GestureID(rawValue: "swipe.right")
     public static let swipeUp = GestureID(rawValue: "swipe.up")
     public static let swipeDown = GestureID(rawValue: "swipe.down")
+    /// Three fingers dragged sideways: the trackpad's Spaces swipe.
+    public static let dockSwipeHorizontal = GestureID(rawValue: "dockSwipe.horizontal")
+    /// Three fingers dragged up/down: the trackpad's Mission Control / App Exposé swipe.
+    public static let dockSwipeVertical = GestureID(rawValue: "dockSwipe.vertical")
 }
 
 public enum Phase: String, Codable, Sendable {

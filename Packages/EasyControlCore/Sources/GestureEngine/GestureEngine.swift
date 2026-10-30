@@ -30,6 +30,7 @@ public final class GestureEngine {
     private var engagement: EngagementController
     private var scroll: ScrollRecognizer
     private var swipe: SwipeRecognizer
+    private var dock: DockSwipeRecognizer
     public private(set) var snapshot = EngineSnapshot()
 
     public init(config: GestureConfig = .default, classifier: any PoseClassifying = RuleBasedPoseClassifier()) {
@@ -38,6 +39,7 @@ public final class GestureEngine {
         engagement = EngagementController(config: config)
         scroll = ScrollRecognizer(config: config)
         swipe = SwipeRecognizer(config: config)
+        dock = DockSwipeRecognizer(config: config)
     }
 
     /// - Parameter lastUserInput: host time of the most recent real keyboard/mouse input, if any.
@@ -79,7 +81,8 @@ public final class GestureEngine {
             let center = reliable ? hand?.features.palmCenter : nil
             let aspect = hand?.hand.aspectRatio ?? 1
             if let e = scroll.update(pose: pose, palmCenter: center, aspect: aspect, at: t) { events.append(e) }
-            if scroll.isActive {
+            if let e = dock.update(pose: pose, palmCenter: center, aspect: aspect, at: t) { events.append(e) }
+            if scroll.isActive || dock.isActive {
                 swipe.reset()
             } else if let e = swipe.update(pose: pose, palmCenter: reliable ? hand?.rawPalmCenter : nil, aspect: aspect, at: t) {
                 events.append(e)
@@ -100,7 +103,7 @@ public final class GestureEngine {
 
     private func endGestures() -> [GestureEvent] {
         swipe.reset()
-        return scroll.cancel().map { [$0] } ?? []
+        return [scroll.cancel(), dock.cancel()].compactMap { $0 }
     }
 
     private static func isActivity(_ e: GestureEvent) -> Bool {

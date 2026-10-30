@@ -27,6 +27,8 @@ public struct GestureConfig: Sendable {
     /// After a swipe, the opposite direction is ignored this long, so the return stroke doesn't undo it.
     public var swipeOppositeLockout: Double = 1.0
     public var scrollDeadZone: Float = 0.004
+    /// Three-finger drag: travel (frame heights) before the drag commits to horizontal or vertical.
+    public var dockSwipeLock: Float = 0.03
 
     public init() {}
 
