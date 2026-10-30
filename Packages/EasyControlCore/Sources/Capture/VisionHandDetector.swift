@@ -14,20 +14,22 @@ public final class VisionHandDetector: @unchecked Sendable {
     }
 
     public func detect(_ buffer: CVPixelBuffer, timestamp: Double) throws -> HandFrame {
-        try perform(VNImageRequestHandler(cvPixelBuffer: buffer, options: [:]), timestamp: timestamp)
+        let aspect = Float(CVPixelBufferGetWidth(buffer)) / Float(max(CVPixelBufferGetHeight(buffer), 1))
+        return try perform(VNImageRequestHandler(cvPixelBuffer: buffer, options: [:]), aspect: aspect, timestamp: timestamp)
     }
 
     public func detect(cgImage: CGImage, timestamp: Double) throws -> HandFrame {
-        try perform(VNImageRequestHandler(cgImage: cgImage, options: [:]), timestamp: timestamp)
+        let aspect = Float(cgImage.width) / Float(max(cgImage.height, 1))
+        return try perform(VNImageRequestHandler(cgImage: cgImage, options: [:]), aspect: aspect, timestamp: timestamp)
     }
 
-    private func perform(_ handler: VNImageRequestHandler, timestamp: Double) throws -> HandFrame {
+    private func perform(_ handler: VNImageRequestHandler, aspect: Float, timestamp: Double) throws -> HandFrame {
         try handler.perform([request])
-        let hands = try (request.results ?? []).map(Self.hand(from:))
+        let hands = try (request.results ?? []).map { try Self.hand(from: $0, aspectRatio: aspect) }
         return HandFrame(timestamp: timestamp, hands: hands)
     }
 
-    static func hand(from observation: VNHumanHandPoseObservation) throws -> Hand {
+    static func hand(from observation: VNHumanHandPoseObservation, aspectRatio: Float) throws -> Hand {
         var joints = [HandTracking.Joint](repeating: HandTracking.Joint.missing, count: JointName.allCases.count)
         for (name, point) in try observation.recognizedPoints(.all) {
             joints[jointName(for: name).rawValue] = HandTracking.Joint(position: convert(point.location), confidence: point.confidence)
@@ -37,7 +39,7 @@ public final class VisionHandDetector: @unchecked Sendable {
         case .right: .right
         default: .unknown
         }
-        return Hand(chirality: chirality, joints: joints)
+        return Hand(chirality: chirality, joints: joints, aspectRatio: aspectRatio)
     }
 
     /// Vision: origin bottom-left, as the camera sees you. Ours: origin top-left, mirrored (+x = user's right).

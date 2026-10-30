@@ -21,11 +21,24 @@ public struct Hand: Codable, Sendable, Equatable {
     public var chirality: Chirality
     /// Exactly 21 joints, indexed by `JointName.rawValue`. Undetected joints have confidence 0.
     public var joints: [Joint]
+    /// Width / height of the image the joints were normalized against. x and y are normalized separately,
+    /// so shape features must scale x by this to be the same for a 4:3 webcam and a 3:4 photo.
+    public var aspectRatio: Float
 
-    public init(chirality: Chirality, joints: [Joint]) {
+    public init(chirality: Chirality, joints: [Joint], aspectRatio: Float = 1) {
         precondition(joints.count == JointName.allCases.count, "a hand has 21 joints")
         self.chirality = chirality
         self.joints = joints
+        self.aspectRatio = aspectRatio
+    }
+
+    private enum CodingKeys: String, CodingKey { case chirality, joints, aspectRatio }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        chirality = try c.decode(Chirality.self, forKey: .chirality)
+        joints = try c.decode([Joint].self, forKey: .joints)
+        aspectRatio = try c.decodeIfPresent(Float.self, forKey: .aspectRatio) ?? 1 // recordings before M3
     }
 
     public subscript(_ name: JointName) -> Joint {
@@ -55,5 +68,18 @@ extension Hand {
     public var palmCenter: SIMD2<Float> {
         let joints: [JointName] = [.wrist, .indexMCP, .middleMCP, .ringMCP, .littleMCP]
         return joints.reduce(SIMD2<Float>.zero) { $0 + self[$1].position } / Float(joints.count)
+    }
+}
+
+extension Hand {
+    /// The same joints with the left/right guess swapped (training augmentation against chirality errors).
+    public func withFlippedChirality() -> Hand {
+        var out = self
+        switch chirality {
+        case .left: out.chirality = .right
+        case .right: out.chirality = .left
+        case .unknown: break
+        }
+        return out
     }
 }

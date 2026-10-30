@@ -1,0 +1,125 @@
+{
+  "criterion": "highest validation accuracy at the app threshold (0.85), gated rows counted as none",
+  "chosen": {
+    "gate": "reliable",
+    "weight_power": 0.5,
+    "hidden": [
+      256,
+      128
+    ]
+  },
+  "runs": [
+    {
+      "gate": "known",
+      "weight_power": 0.0,
+      "hidden": [
+        128,
+        64
+      ],
+      "val": {
+        "acted_accuracy": 0.9201445941505094,
+        "acted_gesture_precision": 0.9890190336749634,
+        "none_false_trigger_rate": 0.004807692307692308,
+        "gated_accuracy": 0.9748660898228265
+      }
+    },
+    {
+      "gate": "known",
+      "weight_power": 0.0,
+      "hidden": [
+        256,
+        128
+      ],
+      "val": {
+        "acted_accuracy": 0.9208018402891883,
+        "acted_gesture_precision": 0.9861717612809315,
+        "none_false_trigger_rate": 0.006181318681318681,
+        "gated_accuracy": 0.9715698393077874
+      }
+    },
+    {
+      "gate": "known",
+      "weight_power": 0.5,
+      "hidden": [
+        128,
+        64
+      ],
+      "val": {
+        "acted_accuracy": 0.919158724942491,
+        "acted_gesture_precision": 0.9832970225127088,
+        "none_false_trigger_rate": 0.008928571428571428,
+        "gated_accuracy": 0.9728059332509271
+      }
+    },
+    {
+      "gate": "known",
+      "weight_power": 0.5,
+      "hidden": [
+        256,
+        128
+      ],
+      "val": {
+        "acted_accuracy": 0.919158724942491,
+        "acted_gesture_precision": 0.9847161572052402,
+        "none_false_trigger_rate": 0.008241758241758242,
+        "gated_accuracy": 0.9723939019365472
+      }
+    },
+    {
+      "gate": "reliable",
+      "weight_power": 0.0,
+      "hidden": [
+        128,
+        64
+      ],
+      "val": {
+        "acted_accuracy": 0.9316464015773908,
+        "acted_gesture_precision": 0.9796061884669479,
+        "none_false_trigger_rate": 0.009615384615384616,
+        "gated_accuracy": 0.9574854651162791
+      }
+    },
+    {
+      "gate": "reliable",
+      "weight_power": 0.0,
+      "hidden": [
+        256,
+        128
+      ],
+      "val": {
+        "acted_accuracy": 0.9424909628655932,
+        "acted_gesture_precision": 0.9895615866388309,
+        "none_false_trigger_rate": 0.006868131868131868,
+        "gated_accuracy": 0.9680232558139535
+      }
+    },
+    {
+      "gate": "reliable",
+      "weight_power": 0.5,
+      "hidden": [
+        128,
+        64
+      ],
+      "val": {
+        "acted_accuracy": 0.938876109102859,
+        "acted_gesture_precision": 0.9805959805959806,
+        "none_false_trigger_rate": 0.009615384615384616,
+        "gated_accuracy": 0.9600290697674418
+      }
+    },
+    {
+      "gate": "reliable",
+      "weight_power": 0.5,
+      "hidden": [
+        256,
+        128
+      ],
+      "val": {
+        "acted_accuracy": 0.94446270128163,
+        "acted_gesture_precision": 0.9814941740918437,
+        "none_false_trigger_rate": 0.009615384615384616,
+        "gated_accuracy": 0.9654796511627907
+      }
+    }
+  ]
+}

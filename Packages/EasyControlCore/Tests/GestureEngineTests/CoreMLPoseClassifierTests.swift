@@ -35,11 +35,19 @@ private func loadClassifier() async throws -> CoreMLPoseClassifier {
     #expect(probs[.pinch] == nil || probs[.pinch] == 0)
 }
 
-@Test func gatedFeaturesAreNone() async throws {
+@Test func unreliableHandsAreNone() async throws {
     let classifier = try await loadClassifier()
     var hand = SyntheticHand.make(.two)
-    hand[.indexTip].confidence = 0.05
+    hand[.wrist].confidence = 0.05
     #expect(classifier.classify(HandFeatureExtractor.extract(hand)) == [.none: 1])
+}
+
+@Test func gateFollowsModelMetadata() async throws {
+    let classifier = try await loadClassifier()
+    var hand = SyntheticHand.make(.two)
+    hand[.indexTip].confidence = 0.05 // reliable hand, one unknown finger
+    let forcedNone = classifier.classify(HandFeatureExtractor.extract(hand)) == [.none: 1]
+    #expect(forcedNone == classifier.requiresKnownFingers)
 }
 
 @Test func modelWithWrongInputLengthIsRejected() async throws {

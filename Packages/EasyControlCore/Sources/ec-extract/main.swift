@@ -30,6 +30,8 @@ struct Sample: Encodable {
     var known: Bool
     var chirality: String
     var palmSize: Float
+    /// A copy with the left/right guess flipped, so the model learns not to depend on Vision's chirality.
+    var augmented: Bool
 }
 
 func argument(_ name: String) -> String? {
@@ -67,12 +69,15 @@ DispatchQueue.concurrentPerform(iterations: jobs) { worker in
         let matches = HandBoxMatcher.match(hands: frame.hands, boxes: boxes)
         var lines = Data()
         for m in matches {
-            let hand = frame.hands[m.hand]
-            let f = HandFeatureExtractor.extract(hand)
-            let sample = Sample(image_id: rec.image_id, split: rec.split, user_id: rec.user_id, source: rec.source,
-                                label: boxes[m.box].label, vector: f.vector, reliable: f.isReliable,
-                                known: !f.fingerKnown.contains(false), chirality: hand.chirality.rawValue, palmSize: f.palmSize)
-            if let json = try? encoder.encode(sample) { lines.append(json); lines.append(0x0A) }
+            for (hand, augmented) in [(frame.hands[m.hand], false), (frame.hands[m.hand].withFlippedChirality(), true)] {
+                if augmented, hand.chirality == .unknown { continue }
+                let f = HandFeatureExtractor.extract(hand)
+                let sample = Sample(image_id: rec.image_id, split: rec.split, user_id: rec.user_id, source: rec.source,
+                                    label: boxes[m.box].label, vector: f.vector, reliable: f.isReliable,
+                                    known: !f.fingerKnown.contains(false), chirality: hand.chirality.rawValue,
+                                    palmSize: f.palmSize, augmented: augmented)
+                if let json = try? encoder.encode(sample) { lines.append(json); lines.append(0x0A) }
+            }
         }
         counts.withLock { c in
             c.images += 1

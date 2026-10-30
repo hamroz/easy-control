@@ -42,6 +42,7 @@ func detectsHandInSampleImage() throws {
     #expect(frame.timestamp == 1)
     #expect(frame.hands.count >= 1)
     #expect(frame.hands[0].joints.filter { $0.confidence > 0.3 }.count >= 15)
+    #expect(abs(frame.hands[0].aspectRatio - Float(image.width) / Float(image.height)) < 1e-6)
 }
 
 @Test func stallDetector() {

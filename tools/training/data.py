@@ -6,23 +6,35 @@ import numpy as np
 
 # Same order and raw values as Swift `PoseClass` (pinch excluded: no training data yet).
 CLASSES = ["openPalm", "fist", "point", "two", "three", "ok", "thumbsUp", "thumbsDown", "none"]
+# Must equal Swift `HandFeatures.vectorLength`.
+N_FEATURES = 55
 
 
-def load(path: str | pathlib.Path) -> tuple[np.ndarray, np.ndarray, list[dict]]:
-    """Returns features, class indices and per-row metadata, keeping only rows that pass the runtime gate
-    (reliable hand, every finger known); the app sends anything else straight to `none`."""
+def passes_gate(row: dict, gate: str) -> bool:
+    """The app's runtime gate: "reliable" = wrist and knuckles confidently detected; "known" additionally
+    requires every finger's middle joint and tip. Rows failing it are classified `none` without the model."""
+    if gate == "none":
+        return True
+    return bool(row["reliable"] and (gate == "reliable" or row["known"]))
+
+
+def load(path: str | pathlib.Path, gate: str = "reliable", augmented: bool = False) -> tuple[np.ndarray, np.ndarray, list[dict]]:
+    """Returns features, class indices and per-row metadata for rows passing `gate`. Chirality-flipped
+    augmentation rows are included only when `augmented` is true (training)."""
     X, y, meta = [], [], []
     with open(path) as f:
         for line in f:
             if not line.strip():
                 continue
             row = json.loads(line)
-            if not (row["reliable"] and row["known"]) or row["label"] not in CLASSES:
+            if row.get("augmented", False) and not augmented:
+                continue
+            if not passes_gate(row, gate) or row["label"] not in CLASSES:
                 continue
             X.append(row["vector"])
             y.append(CLASSES.index(row["label"]))
             meta.append({k: v for k, v in row.items() if k != "vector"})
-    return np.asarray(X, dtype=np.float32).reshape(-1, 52), np.asarray(y, dtype=np.int64), meta
+    return np.asarray(X, dtype=np.float32).reshape(-1, N_FEATURES), np.asarray(y, dtype=np.int64), meta
 
 
 def class_weights(y: np.ndarray, n_classes: int, power: float = 1.0) -> np.ndarray:

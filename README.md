@@ -2,7 +2,7 @@
 
 Control your Mac with hand gestures through the built-in camera. Everything runs on-device: Apple Vision finds 21 hand landmarks per hand, and EasyControl's own gesture engine turns them into scrolling, Space switching and Mission Control — no cloud, no LLM, no frames ever stored.
 
-> **Status: M3.** Engage with an open palm, scroll with two fingers, swipe an open palm to switch Spaces or open Mission Control. Poses are recognized by EasyControl's own Core ML classifier (97.8 % on people it has never seen). Cursor mode (M4) and custom gestures (M5) are next. See the [design spec](docs/superpowers/specs/2026-10-29-easycontrol-design.md).
+> **Status: M3.** Engage with an open palm, scroll with two fingers, swipe an open palm to switch Spaces or open Mission Control. Poses are recognized by EasyControl's own Core ML classifier (94.9 % end to end on people it has never seen; when it acts on a gesture it is right 98.2 % of the time). Cursor mode (M4) and custom gestures (M5) are next. See the [design spec](docs/superpowers/specs/2026-10-29-easycontrol-design.md).
 
 ## How it works
 
@@ -28,12 +28,17 @@ EasyControl trains its own model rather than using an off-the-shelf gesture reco
 
 1. `tools/dataset` picks ~22 k images from [HaGRID](https://github.com/hukenovs/hagrid) using its **subject-disjoint** train/val/test splits.
 2. `ec-extract` runs the *app's own* Vision detector and feature code on every image, so training features are exactly what the app computes live.
-3. `tools/training` trains a small MLP (52 → 256 → 128 → 9) with standardization folded in and exports Core ML.
+3. `tools/training` trains a small MLP (55 → 256 → 128 → 9) with standardization folded in and exports Core ML. Features are aspect-ratio corrected and include absolute hand orientation; every training hand also appears with its left/right label flipped, so the model doesn't depend on Vision's chirality guess.
 
-| Classifier | Accuracy on held-out people | Macro F1 |
+Measured end to end on HaGRID's held-out subjects, counting every detected hand the way the app does (hands failing the confidence gate count as `none`; the app only acts at ≥ 0.85 probability):
+
+| Metric | Core ML model | Hand-written rules (M2) |
 |---|---|---|
-| **EasyControl Core ML model** | **97.8 %** | **0.973** |
-| Hand-written rules (M2) | 41.7 % | 0.314 |
+| Accuracy | **94.9 %** | 41.7 %* |
+| When it acts on a gesture, it is right | **98.2 %** | — |
+| Non-gesture hands turned into a gesture | **1.5 %** | — |
+
+\* The rules cover only 6 of the 9 classes. The spec's 97 % target is **not yet met** end to end, and the false-trigger benchmark awaits real recordings, so M3 is code-complete but not exited.
 
 Full results, per-class metrics, confusion matrix and model selection: [docs/eval/m3-report.md](docs/eval/m3-report.md). The model is 196 KB, runs on the CPU in well under a millisecond, and is licensed CC BY-SA 4.0 ([App/Resources/MODEL_LICENSE.md](App/Resources/MODEL_LICENSE.md)).
 

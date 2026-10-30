@@ -13,10 +13,13 @@ public enum PoseModelError: Error, CustomStringConvertible {
     }
 }
 
-/// The learned pose classifier (trained in `tools/training`). Same runtime gate as the rules: unreliable
-/// hands and hands with unknown fingers are `.none` before the model runs.
+/// The learned pose classifier (trained in `tools/training`). Hands failing the gate the model was trained
+/// behind (recorded in its metadata) are `.none` before the model runs.
 public final class CoreMLPoseClassifier: PoseClassifying, @unchecked Sendable {
     public let name = "coreml"
+    /// Whether the model was trained only on hands with every finger detected (metadata `gate == "known"`);
+    /// otherwise only the wrist and knuckles must be reliable.
+    public let requiresKnownFingers: Bool
     private let model: MLModel
     private let log = Logger(subsystem: "dev.hamroz.easycontrol", category: "classifier")
     private var reportedFailure = false
@@ -37,6 +40,8 @@ public final class CoreMLPoseClassifier: PoseClassifying, @unchecked Sendable {
         guard description.outputDescriptionsByName["classLabel_probs"] != nil else {
             throw PoseModelError.incompatible("missing output 'classLabel_probs'")
         }
+        let metadata = description.metadata[.creatorDefinedKey] as? [String: String] ?? [:]
+        requiresKnownFingers = metadata["gate"] == "known"
         let labels = description.classLabels as? [String] ?? []
         guard !labels.isEmpty, labels.allSatisfy({ PoseClass(rawValue: $0) != nil }) else {
             throw PoseModelError.incompatible("class labels \(labels) don't match PoseClass")
@@ -49,7 +54,7 @@ public final class CoreMLPoseClassifier: PoseClassifying, @unchecked Sendable {
     }
 
     public func classify(_ features: HandFeatures) -> [PoseClass: Float] {
-        guard features.isReliable, !features.fingerKnown.contains(false) else { return [.none: 1] }
+        guard features.isReliable, !(requiresKnownFingers && features.fingerKnown.contains(false)) else { return [.none: 1] }
         return classify(vector: features.vector)
     }
 

@@ -55,6 +55,9 @@ Open **Debug Window…** from the menu-bar hand icon for every step below.
 - [ ] Hold each pose for a few seconds — open palm, fist, point (index up), two (V), three, OK, thumbs up, thumbs down — and note any the panel misreads: ____
 - [ ] Relaxed hand, half-curled fingers, an L-shape, four fingers: panel says `none`, not a gesture.
 - [ ] Both hands, near and far (palm size 0.06–0.2), side-lit and back-lit.
+- [ ] Thumbs up and thumbs down with **each** hand (these used to depend on the left/right guess).
+- [ ] Back of the hand toward the camera for each pose.
+- [ ] Watch the hand's left/right label in the debug panel for flicker while holding still.
 
 ## 8. Data for the false-trigger benchmark and pinch
 - [ ] Debug window → recorder label `normal-use` → record 5 minutes of ordinary work (typing, talking, coffee).

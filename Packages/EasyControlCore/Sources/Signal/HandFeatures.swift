@@ -11,18 +11,22 @@ public struct HandFeatures: Sendable, Equatable {
     public var fingerKnown: [Bool]
     /// Bend angle in radians at each finger's middle joint (thumb: MP; others: PIP). π = straight.
     public var bendAngles: [Float]
+    /// Absolute orientation, independent of the left/right guess: sin and cos of the wrist→middle-MCP direction
+    /// in the image, and how far the thumb tip is above the wrist (in palm sizes). Normalization removes
+    /// rotation and mirrors left hands, so without these thumbs-up and thumbs-down differ only by chirality.
+    public var orientation: [Float]
     /// Mean of wrist and the four MCPs, in image coordinates.
     public var palmCenter: SIMD2<Float>
-    /// |wrist − middle MCP| in image coordinates; a proxy for distance from the camera.
+    /// |wrist − middle MCP| in image heights; a proxy for distance from the camera.
     public var palmSize: Float
     public var isReliable: Bool
 
     /// Length of `vector`; the Core ML model's input must match it.
-    public static let vectorLength = 52
+    public static let vectorLength = 55
 
-    /// 42 normalized coordinates + 5 extension flags (0/1) + 5 bend angles.
+    /// 42 normalized coordinates + 5 extension flags (0/1) + 5 bend angles + 3 orientation values.
     public var vector: [Float] {
-        normalized.flatMap { [$0.x, $0.y] } + fingerExtended.map { $0 ? 1 : 0 } + bendAngles
+        normalized.flatMap { [$0.x, $0.y] } + fingerExtended.map { $0 ? 1 : 0 } + bendAngles + orientation
     }
 }
 
@@ -55,6 +59,9 @@ public enum HandFeatureExtractor {
         }
 
         let size = HandNormalizer.palmSize(hand)
+        let axis = HandNormalizer.isotropic(hand, .middleMCP) - HandNormalizer.isotropic(hand, .wrist)
+        let heading = atan2(axis.y, axis.x)
+        let thumbAbove = (hand[.wrist].position.y - hand[.thumbTip].position.y) / max(size, 1e-6)
         let confident = requiredJoints.allSatisfy { hand[$0].confidence >= minConfidence }
         let center = requiredJoints.reduce(SIMD2<Float>.zero) { $0 + hand[$1].position } / Float(requiredJoints.count)
         return HandFeatures(
@@ -62,6 +69,7 @@ public enum HandFeatureExtractor {
             fingerExtended: extended,
             fingerKnown: known,
             bendAngles: bends,
+            orientation: [sin(heading), cos(heading), thumbAbove],
             palmCenter: center,
             palmSize: size,
             isReliable: confident && size >= 0.02

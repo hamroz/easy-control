@@ -55,3 +55,19 @@ import TestSupport
     #expect(decoded.count == 10)
     #expect(decoded == script.frames)
 }
+
+@Test func olderRecordingsWithoutAspectDecode() throws {
+    var hand = SyntheticHand.make(.fist)
+    hand.aspectRatio = 4.0 / 3.0
+    var json = String(decoding: try JSONEncoder().encode(hand), as: UTF8.self)
+    json = json.replacingOccurrences(of: #","aspectRatio":1.3333334"#, with: "").replacingOccurrences(of: #""aspectRatio":1.3333334,"#, with: "")
+    #expect(!json.contains("aspectRatio"))
+    #expect(try JSONDecoder().decode(Hand.self, from: Data(json.utf8)).aspectRatio == 1)
+}
+
+@Test func flippingChiralitySwapsLeftAndRight() {
+    #expect(SyntheticHand.make(.two, chirality: .right).withFlippedChirality().chirality == .left)
+    #expect(SyntheticHand.make(.two, chirality: .left).withFlippedChirality().chirality == .right)
+    let unknown = SyntheticHand.make(.two, chirality: .unknown)
+    #expect(unknown.withFlippedChirality() == unknown)
+}

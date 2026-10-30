@@ -53,6 +53,42 @@ private func rotated(_ hand: Hand, by angle: Float) -> Hand {
     #expect(HandFeatureExtractor.extract(SyntheticHand.make(.openPalm)).isReliable == true)
 }
 
-@Test func vectorLengthIs52() {
-    #expect(HandFeatureExtractor.extract(SyntheticHand.make(.three)).vector.count == 52)
+@Test func vectorLengthMatchesConstant() {
+    #expect(HandFeatures.vectorLength == 55)
+    #expect(HandFeatureExtractor.extract(SyntheticHand.make(.three)).vector.count == HandFeatures.vectorLength)
+}
+
+/// The same physical hand seen in an image of a different shape: normalized x shrinks by the aspect ratio.
+private func seen(_ hand: Hand, inAspect aspect: Float) -> Hand {
+    var out = hand
+    for i in out.joints.indices { out.joints[i].position.x = 0.5 + (out.joints[i].position.x - 0.5) / aspect }
+    out.aspectRatio = aspect
+    return out
+}
+
+@Test func aspectCorrectionRecoversShape() {
+    let square = SyntheticHand.make(.openPalm)
+    let landscape = seen(square, inAspect: 4.0 / 3.0)  // 640×480 webcam
+    let portrait = seen(square, inAspect: 512.0 / 683.0) // HaGRID 512px photo
+    let a = HandFeatureExtractor.extract(square), b = HandFeatureExtractor.extract(landscape)
+    let c = HandFeatureExtractor.extract(portrait)
+    #expect(close(a.normalized, b.normalized))
+    #expect(close(a.normalized, c.normalized))
+    #expect(abs(a.palmSize - b.palmSize) < 1e-4)
+}
+
+@Test func orientationFeaturesIgnoreChirality() {
+    var flipped = SyntheticHand.make(.two)
+    flipped.chirality = .left // same joints, wrong left/right guess
+    let a = HandFeatureExtractor.extract(SyntheticHand.make(.two)), b = HandFeatureExtractor.extract(flipped)
+    #expect(zip(a.orientation, b.orientation).allSatisfy { abs($0 - $1) < 1e-5 })
+    #expect(!close(a.normalized, b.normalized))
+}
+
+@Test func orientationTracksRotation() {
+    let upright = HandFeatureExtractor.extract(SyntheticHand.make(.openPalm))
+    let upsideDown = HandFeatureExtractor.extract(rotated(SyntheticHand.make(.openPalm), by: .pi))
+    #expect(abs(upright.orientation[0] + upsideDown.orientation[0]) < 1e-4)
+    #expect(abs(upright.orientation[1] + upsideDown.orientation[1]) < 1e-4)
+    #expect(upright.orientation[2] > 0 && upsideDown.orientation[2] < 0) // thumb above / below the wrist
 }
