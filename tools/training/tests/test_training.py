@@ -76,3 +76,26 @@ def test_class_weight_power_softens_weighting():
     y = np.array([0] * 90 + [1] * 10)
     assert abs(float(class_weights(y, 2, power=0.5)[1] / class_weights(y, 2, power=0.5)[0]) - 3) < 1e-5
     assert np.allclose(class_weights(y, 2, power=0.0), 1)
+
+
+def test_hagrid_metrics_exclude_local_rows(tmp_path):
+    from train import Split
+    v = [0.0] * N_FEATURES
+    rows = [
+        {"label": "openPalm", "vector": v, "reliable": True, "known": True, "augmented": False, "split": "test", "user_id": "u1"},
+        {"label": "pinch", "vector": v, "reliable": True, "known": True, "augmented": False, "split": "test", "user_id": "local-user"},
+    ]
+    path = tmp_path / "f.jsonl"
+    path.write_text("\n".join(json.dumps(r) for r in rows))
+    assert [CLASSES[i] for i in Split([path], "test", "reliable", False, group="hagrid").y] == ["openPalm"]
+    assert [CLASSES[i] for i in Split([path], "test", "reliable", False, group="local").y] == ["pinch"]
+    assert "pinch" in CLASSES
+
+
+def test_local_weight_repeats_local_rows():
+    from train import weighted
+    X = np.arange(6, dtype="f").reshape(3, 2)
+    y = np.array([0, 1, 2])
+    meta = [{"user_id": "u1"}, {"user_id": "local-user"}, {"user_id": "u2"}]
+    Xw, yw = weighted(X, y, meta, local_weight=3)
+    assert list(yw).count(1) == 3 and list(yw).count(0) == 1 and len(Xw) == 5

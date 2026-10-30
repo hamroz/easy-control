@@ -71,3 +71,22 @@ import TestSupport
     let unknown = SyntheticHand.make(.two, chirality: .unknown)
     #expect(unknown.withFlippedChirality() == unknown)
 }
+
+@Test func recordingSplitIsTemporal() {
+    let timestamps = (0..<300).map { Double($0) / 30 } // 10 s recording
+    let splits = RecordingSplitter.assign(timestamps: timestamps, trim: 1, trainFraction: 0.6, valFraction: 0.15)
+    #expect(splits.prefix(30).allSatisfy { $0 == nil })           // first second dropped
+    #expect(splits.suffix(30).allSatisfy { $0 == nil })           // last second dropped
+    let kept = splits.compactMap { $0 }
+    #expect(kept.first == "train" && kept.last == "test")
+    // Strictly ordered in time: train, then val, then test.
+    let order = ["train": 0, "val": 1, "test": 2]
+    #expect(zip(kept, kept.dropFirst()).allSatisfy { order[$0]! <= order[$1]! })
+    let share = { (s: String) in Double(kept.filter { $0 == s }.count) / Double(kept.count) }
+    #expect(abs(share("train") - 0.6) < 0.02 && abs(share("val") - 0.15) < 0.02)
+}
+
+@Test func recordingLabelComesFromFileName() {
+    #expect(RecordingSplitter.label(forFileName: "thumbsUp-2026-10-30T01-04-14Z.jsonl") == "thumbsUp")
+    #expect(RecordingSplitter.label(forFileName: "normal-use-2026-10-30T00-43-24Z.jsonl") == "normal-use")
+}

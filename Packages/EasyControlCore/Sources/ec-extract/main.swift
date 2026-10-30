@@ -39,8 +39,49 @@ func argument(_ name: String) -> String? {
     return args.firstIndex(of: name).flatMap { args.indices.contains($0 + 1) ? args[$0 + 1] : nil }
 }
 
+// Recordings mode: the user's own landmark recordings (from the debug window) become personal training data.
+if let recordingsPath = argument("--recordings"), let outPath = argument("--out") {
+    let dir = URL(fileURLWithPath: recordingsPath)
+    let files = try FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
+        .filter { $0.pathExtension == "jsonl" }.sorted { $0.path < $1.path }
+    var out = Data()
+    let encoder = JSONEncoder()
+    for file in files {
+        let fileLabel = RecordingSplitter.label(forFileName: file.lastPathComponent)
+        let normalUse = fileLabel == "normal-use"
+        let label = normalUse ? "none" : fileLabel
+        let frames = try HandFrameRecording.decode(Data(contentsOf: file))
+        let splits = RecordingSplitter.assign(timestamps: frames.map(\.timestamp))
+        var rows = 0
+        for (index, (frame, split)) in zip(frames, splits).enumerated() {
+            // Consecutive frames are near-duplicates: every 3rd frame of normal use, every 2nd of a pose.
+            guard let split, index % (normalUse ? 3 : 2) == 0 else { continue }
+            // In a pose recording the posed hand is the largest; in normal use every hand is a `none`.
+            let hands = normalUse ? frame.hands
+                : Array(frame.hands.max { HandNormalizer.palmSize($0) < HandNormalizer.palmSize($1) }.map { [$0] } ?? [])
+            for original in hands {
+                let variants = split == "train" ? [(original, false), (original.withFlippedChirality(), true)] : [(original, false)]
+                for (hand, augmented) in variants where !(augmented && hand.chirality == .unknown) {
+                    let f = HandFeatureExtractor.extract(hand)
+                    let sample = Sample(image_id: "\(file.lastPathComponent)#\(index)", split: split, user_id: "local-user",
+                                        source: "recording:\(fileLabel)", label: label, vector: f.vector,
+                                        reliable: f.isReliable, known: !f.fingerKnown.contains(false),
+                                        chirality: hand.chirality.rawValue, palmSize: f.palmSize, augmented: augmented)
+                    out.append(try encoder.encode(sample))
+                    out.append(0x0A)
+                    rows += 1
+                }
+            }
+        }
+        print("\(file.lastPathComponent): \(label), \(rows) rows")
+    }
+    try out.write(to: URL(fileURLWithPath: outPath))
+    exit(0)
+}
+
 guard let manifestPath = argument("--manifest"), let imagesPath = argument("--images"), let outPath = argument("--out") else {
     print("usage: ec-extract --manifest <jsonl> --images <dir> --out <jsonl> [--jobs N]")
+    print("       ec-extract --recordings <dir> --out <jsonl>")
     exit(2)
 }
 let jobs = argument("--jobs").flatMap(Int.init) ?? ProcessInfo.processInfo.activeProcessorCount

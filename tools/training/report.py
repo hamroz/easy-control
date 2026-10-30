@@ -31,7 +31,8 @@ def render(m: dict) -> str:
         "",
         "| Class | Recall | Support |",
         "|---|---|---|",
-        *[f"| {c} | {t['acted_recall'][c]:.3f} | {t['support'][c]} |" for c in classes],
+        *[f"| {c} | {t['acted_recall'][c]:.3f} | {t['support'][c]} |" if t["support"][c] else f"| {c} | — | 0 |"
+          for c in classes],
         "",
         "## Confusion matrix (test, end to end, acting at the threshold; rows = truth)",
         "",
@@ -39,6 +40,7 @@ def render(m: dict) -> str:
         "|---" * (len(classes) + 1) + "|",
         *[f"| **{c}** | " + " | ".join(str(v) for v in row) + " |" for c, row in zip(classes, t["confusion_acted"])],
         "",
+        *(_local_section(m) if m.get("local") else []),
         "## Model and selection",
         "",
         f"Chosen: gate `{m['config']['gate']}`, class-weight power {m['config']['weight_power']}, MLP "
@@ -72,3 +74,32 @@ def render(m: dict) -> str:
         "`App/Resources/MODEL_LICENSE.md`.",
     ]
     return "\n".join(lines) + "\n"
+
+
+def _local_section(m: dict) -> list[str]:
+    loc, classes = m["local"], m["classes"]
+    return [
+        "## Your hand (personalization)",
+        "",
+        f"The user's own recordings were added to training ({m['sizes']['local_train_rows_incl_augmented']} rows incl. "
+        f"flipped copies, counted ×{m['config'].get('local_weight', 1)}) and evaluated on the **last 25 % of each "
+        f"recording** ({m['sizes']['local_test']} hands), "
+        "which the model never saw. Same person, so this measures fit to the user, not generalization; the HaGRID "
+        "numbers above exclude every personal row.",
+        "",
+        f"Accuracy acting at ≥ {m['threshold']}: **{loc['acted_accuracy']:.1%}**; "
+        f"`none` hands turned into a gesture: {loc['none_false_trigger_rate']:.1%}.",
+        "",
+        "| Class | Recall | Support |",
+        "|---|---|---|",
+        *[f"| {c} | {loc['acted_recall'][c]:.3f} | {loc['support'][c]} |" for c in classes if loc["support"][c]],
+        "",
+        "How much the personal rows count was chosen on each recording's validation slice (the 15 % before the "
+        "test part), keeping HaGRID validation gesture precision within 0.5 pt of weight 1:",
+        "",
+        "| Personal weight | Your val accuracy @ threshold | HaGRID val gesture precision |",
+        "|---|---|---|",
+        *[f"| ×{r['local_weight']} | {r['local_val_acted']:.4f} | {r['hagrid_val_precision']:.4f} |"
+          for r in m["selection"].get("local_runs", [])],
+        "",
+    ]

@@ -6,7 +6,8 @@
     "hidden": [
       256,
       128
-    ]
+    ],
+    "local_weight": 10
   },
   "runs": [
     {
@@ -121,5 +122,26 @@
         "gated_accuracy": 0.9654796511627907
       }
     }
-  ]
+  ],
+  "local_runs": [
+    {
+      "local_weight": 1,
+      "local_val_acted": 0.8346180798878766,
+      "hagrid_val_precision": 0.976775956284153,
+      "hagrid_val_acted": 0.9415050936575747
+    },
+    {
+      "local_weight": 3,
+      "local_val_acted": 0.8395234758234057,
+      "hagrid_val_precision": 0.9766323024054983,
+      "hagrid_val_acted": 0.9382188629641801
+    },
+    {
+      "local_weight": 10,
+      "local_val_acted": 0.8486334968465312,
+      "hagrid_val_precision": 0.9752747252747253,
+      "hagrid_val_acted": 0.9382188629641801
+    }
+  ],
+  "local_criterion": "highest acted accuracy on the user's validation slice, keeping HaGRID validation gesture precision within 0.5 pt of weight 1"
 }

@@ -16,7 +16,7 @@ import torch
 from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, precision_recall_fscore_support
 from torch import nn
 
-from data import CLASSES, class_weights, load, passes_gate
+from data import CLASSES, LOCAL_USER, class_weights, load, passes_gate
 from model import PoseMLP, export_coreml
 from report import render
 
@@ -51,11 +51,14 @@ def rules(X: np.ndarray) -> np.ndarray:
 
 
 class Split:
-    """Every matched hand of one split (augmented copies only for training), with its gate result."""
+    """Every matched hand of one split (augmented copies only for training), with its gate result.
+    `group`: "hagrid", "local" (the user's own recordings) or "all"."""
 
-    def __init__(self, path: pathlib.Path, split: str, gate: str, augmented: bool):
-        X, y, meta = load(path, gate="none", augmented=augmented)
-        keep = np.array([m["split"] == split for m in meta])
+    def __init__(self, paths: list[pathlib.Path], split: str, gate: str, augmented: bool, group: str = "all"):
+        X, y, meta = load(paths, gate="none", augmented=augmented)
+        in_group = {"all": lambda m: True, "hagrid": lambda m: m["user_id"] != LOCAL_USER,
+                    "local": lambda m: m["user_id"] == LOCAL_USER}[group]
+        keep = np.array([m["split"] == split and in_group(m) for m in meta], dtype=bool)
         self.X, self.y = X[keep], y[keep]
         self.meta = [m for m, k in zip(meta, keep) if k]
         self.gated = np.array([passes_gate(m, gate) for m in self.meta])
@@ -100,9 +103,19 @@ def evaluate_rules(s: Split) -> dict:
             "own_classes_accuracy": float(accuracy_score(s.y[mask], pred[mask]))}
 
 
+def weighted(X: np.ndarray, y: np.ndarray, meta: list[dict], local_weight: int) -> tuple[np.ndarray, np.ndarray]:
+    """Repeats the user's own rows `local_weight` times so personalization isn't drowned out by HaGRID."""
+    local = np.array([m["user_id"] == LOCAL_USER for m in meta], dtype=bool)
+    if local_weight <= 1 or not local.any():
+        return X, y
+    return (np.concatenate([X] + [X[local]] * (local_weight - 1)),
+            np.concatenate([y] + [y[local]] * (local_weight - 1)))
+
+
 def fit(train: Split, val: Split, cfg: dict, epochs: int = 80) -> tuple[PoseMLP, int]:
     seed()
-    X, y = train.X[train.gated], train.y[train.gated]
+    gated_meta = [m for m, g in zip(train.meta, train.gated) if g]
+    X, y = weighted(train.X[train.gated], train.y[train.gated], gated_meta, cfg.get("local_weight", 1))
     model = PoseMLP(X.mean(0), X.std(0), len(CLASSES), hidden=tuple(cfg["hidden"]))
     loss_fn = nn.CrossEntropyLoss(weight=torch.from_numpy(class_weights(y, len(CLASSES), cfg["weight_power"])))
     opt = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
@@ -128,16 +141,20 @@ def fit(train: Split, val: Split, cfg: dict, epochs: int = 80) -> tuple[PoseMLP,
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--features", default=str(ROOT / "data/hagrid/features.jsonl"))
+    p.add_argument("--local", default=str(ROOT / "data/local/features.jsonl"),
+                   help="the user's own recordings (ec-extract --recordings); used if present")
     p.add_argument("--sweep", action="store_true", help="select the configuration on the validation split first")
+    p.add_argument("--sweep-local", action="store_true",
+                   help="choose how much the user's recordings count, on their validation slice")
     args = p.parse_args()
-    path = pathlib.Path(args.features)
+    paths = [pathlib.Path(args.features), pathlib.Path(args.local)]
 
     cfg, sweep = dict(DEFAULT), []
     if args.sweep:
         for gate, power, hidden in itertools.product(GRID["gate"], GRID["weight_power"], GRID["hidden"]):
             c = {"gate": gate, "weight_power": power, "hidden": hidden}
-            model, _ = fit(Split(path, "train", gate, True), Split(path, "val", gate, False), c)
-            v = evaluate(model, Split(path, "val", gate, False))
+            model, _ = fit(Split(paths, "train", gate, True), Split(paths, "val", gate, False, "hagrid"), c)
+            v = evaluate(model, Split(paths, "val", gate, False, "hagrid"))
             sweep.append({**c, "val": {k: v[k] for k in ("acted_accuracy", "acted_gesture_precision",
                                                          "none_false_trigger_rate", "gated_accuracy")}})
             print(f"VAL {c} acted_acc={v['acted_accuracy']:.4f} precision={v['acted_gesture_precision']:.4f}")
@@ -151,10 +168,36 @@ def main() -> None:
         recorded = json.loads(SWEEP_FILE.read_text())
         cfg, sweep = recorded["chosen"], recorded["runs"]
 
-    train, val = Split(path, "train", cfg["gate"], True), Split(path, "val", cfg["gate"], False)
-    test = Split(path, "test", cfg["gate"], False)
+    local_sweep = []
+    if args.sweep_local:
+        gate = cfg["gate"]
+        train_all = Split(paths, "train", gate, True)
+        hval, lval = Split(paths, "val", gate, False, "hagrid"), Split(paths, "val", gate, False, "local")
+        for w in (1, 3, 10):
+            c = {**cfg, "local_weight": w}
+            model, _ = fit(train_all, hval, c)
+            h, loc = evaluate(model, hval), evaluate(model, lval)
+            local_sweep.append({"local_weight": w, "local_val_acted": loc["acted_accuracy"],
+                                "hagrid_val_precision": h["acted_gesture_precision"],
+                                "hagrid_val_acted": h["acted_accuracy"]})
+            print(f"LOCAL w={w} local_val_acted={loc['acted_accuracy']:.4f} hagrid_val_precision={h['acted_gesture_precision']:.4f}")
+        floor = local_sweep[0]["hagrid_val_precision"] - 0.005  # don't buy personal recall with more false triggers
+        allowed = [r for r in local_sweep if r["hagrid_val_precision"] >= floor]
+        cfg["local_weight"] = max(allowed, key=lambda r: r["local_val_acted"])["local_weight"]
+        recorded = json.loads(SWEEP_FILE.read_text()) if SWEEP_FILE.exists() else {"runs": sweep}
+        recorded.update({"chosen": cfg, "local_runs": local_sweep,
+                         "local_criterion": "highest acted accuracy on the user's validation slice, keeping HaGRID "
+                                            "validation gesture precision within 0.5 pt of weight 1"})
+        SWEEP_FILE.write_text(json.dumps(recorded, indent=2) + "\n")
+    elif SWEEP_FILE.exists():
+        local_sweep = json.loads(SWEEP_FILE.read_text()).get("local_runs", [])
+
+    train, val = Split(paths, "train", cfg["gate"], True), Split(paths, "val", cfg["gate"], False, "hagrid")
+    test = Split(paths, "test", cfg["gate"], False, "hagrid")
+    local_test = Split(paths, "test", cfg["gate"], False, "local")
     model, best_epoch = fit(train, val, cfg)
     result = evaluate(model, test)
+    local_result = evaluate(model, local_test) if len(local_test.y) else None
 
     mlmodel = export_coreml(model, ROOT / "App/Resources/PoseClassifier.mlpackage", CLASSES, gate=cfg["gate"])
     Xg = test.X[test.gated]
@@ -168,11 +211,14 @@ def main() -> None:
         "threshold": THRESHOLD,
         "config": cfg,
         "selection": {"criterion": "highest validation accuracy at the app threshold, gated rows counted as none",
-                      "runs": sweep},
-        "sizes": {"train_rows_incl_augmented": int(train.gated.sum()), "val": len(val.y), "test": len(test.y)},
+                      "runs": sweep, "local_runs": local_sweep},
+        "sizes": {"train_rows_incl_augmented": int(train.gated.sum()), "val": len(val.y), "test": len(test.y),
+                  "local_train_rows_incl_augmented": int(sum(1 for m in train.meta if m["user_id"] == LOCAL_USER)),
+                  "local_test": len(local_test.y)},
         "subjects": {"train": train.users, "val": val.users, "test": test.users},
         "training": {"best_epoch": best_epoch},
         "test": result,
+        "local": local_result,
         "rules": evaluate_rules(test),
         "coreml_check": {"n": n, "agreement": float(np.mean(np.array(coreml_pred) == torch_pred))},
     }
@@ -191,6 +237,9 @@ def main() -> None:
     print(f"config {cfg}  test: acted {result['acted_accuracy']:.4f}  end-to-end {result['end_to_end_accuracy']:.4f}  "
           f"gated {result['gated_accuracy']:.4f}  precision {result['acted_gesture_precision']:.4f}  "
           f"none→gesture {result['none_false_trigger_rate']:.4f}  coreml agreement {metrics['coreml_check']['agreement']:.3f}")
+    if local_result:
+        print(f"your hand (held-out time segments): acted {local_result['acted_accuracy']:.4f}  "
+              + "  ".join(f"{c} {local_result['acted_recall'][c]:.2f}" for c in CLASSES if local_result["support"][c]))
 
 
 if __name__ == "__main__":
