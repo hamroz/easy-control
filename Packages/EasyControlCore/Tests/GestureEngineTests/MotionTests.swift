@@ -30,7 +30,9 @@ private func runSwipe(_ samples: [Sample]) -> [GestureEvent] {
     for s in linear(.two, from: [0.5, 0.4], to: [0.5, 0.6], over: 0.5, start: 0) {
         if let e = r.update(pose: s.pose, palmCenter: s.center, at: s.t) { events.append(e) }
     }
-    if let e = r.update(pose: .openPalm, palmCenter: [0.5, 0.6], at: 0.6) { events.append(e) }
+    for i in 0..<4 { // a different pose must persist a few frames to end the scroll
+        if let e = r.update(pose: .openPalm, palmCenter: [0.5, 0.6], at: 0.6 + Double(i) / 30) { events.append(e) }
+    }
 
     #expect(events.first == .continuous(.scroll, phase: .began, delta: .zero))
     #expect(events.last == .continuous(.scroll, phase: .ended, delta: .zero))
@@ -52,7 +54,19 @@ private func runSwipe(_ samples: [Sample]) -> [GestureEvent] {
 @Test func scrollEndsWhenHandLost() {
     var r = ScrollRecognizer(config: .default)
     _ = r.update(pose: .two, palmCenter: [0.5, 0.5], at: 0)
-    #expect(r.update(pose: .none, palmCenter: nil, at: 0.033) == .continuous(.scroll, phase: .cancelled, delta: .zero))
+    #expect(r.update(pose: .none, palmCenter: nil, at: 0.033) == nil) // a dropped frame is tolerated…
+    #expect(r.update(pose: .none, palmCenter: nil, at: 0.3) == .continuous(.scroll, phase: .cancelled, delta: .zero)) // …a lost hand isn't
+}
+
+@Test func scrollRidesThroughBriefPoseFlicker() {
+    var r = ScrollRecognizer(config: .default)
+    var events: [GestureEvent] = []
+    let poses: [PoseClass] = [.two, .two, .three, .three, .two, .two] // shorter than continuousReleaseFrames
+    for (i, pose) in poses.enumerated() {
+        if let e = r.update(pose: pose, palmCenter: [0.5, 0.5 + 0.01 * Float(i)], at: Double(i) / 30) { events.append(e) }
+    }
+    #expect(!events.contains { if case .continuous(_, .ended, _) = $0 { return true }; return false })
+    #expect(events.filter { if case .continuous(_, .began, _) = $0 { return true }; return false }.count == 1)
 }
 
 @Test func fastLeftSwipeFires() {
