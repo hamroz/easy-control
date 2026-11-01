@@ -1,3 +1,5 @@
+import Signal
+
 /// Pinch as touch, on top of the pointer (spec §2.1): hover moves the pointer; a quick pinch clicks where the
 /// pinch began; pinch-and-move scrolls (content follows the hand); pinch held still then moved drags.
 /// Thumb + middle tap is a right click. Positions are isotropic frame heights of the index knuckle.
@@ -17,6 +19,7 @@ public struct TouchRecognizer {
     private var history: [(t: Double, ratio: Float, anchor: SIMD2<Float>)] = []
     private var lastTap: (t: Double, position: SIMD2<Float>, button: MouseButton)?
     private var lostSince: Double?
+    private var scrollBand = Deadband()
     /// A pinch must be seen open before it can press (e.g. one already closed when engagement starts).
     private var armed = false
     private let grace: Double
@@ -64,11 +67,16 @@ public struct TouchRecognizer {
                 return [.button(button, .click(count: clickCount(at: t, position: contact, button: button)), anchorTime: anchorTime)]
             }
             guard button == .left else { return [] }
-            if travel >= config.slop, t - start < config.holdTime {
-                state = .scrolling(last: anchor)
-                return [.continuous(.scroll, phase: .began, delta: anchor - contact)]
+            let held = t - start >= config.holdTime
+            if travel >= config.slop {
+                // Moving starts a scroll — also when the first frame past the slop arrives after the hold time.
+                scrollBand = Deadband(radius: config.scrollDeadband)
+                _ = scrollBand.filter(contact)
+                let filtered = scrollBand.filter(anchor)
+                state = .scrolling(last: filtered)
+                return [.continuous(.scroll, phase: .began, delta: filtered - contact)]
             }
-            if t - start >= config.holdTime, travel < config.slop {
+            if held {
                 state = .dragging
                 tracking = true
                 return [.button(.left, .down, anchorTime: anchorTime), .pointerTrack(position: pointer, at: t)]
@@ -80,8 +88,9 @@ public struct TouchRecognizer {
                 state = .hover
                 return [.continuous(.scroll, phase: .ended, delta: .zero)]
             }
-            state = .scrolling(last: anchor)
-            let delta = anchor - last
+            let filtered = scrollBand.filter(anchor) // jitter while holding a scroll is ignored
+            state = .scrolling(last: filtered)
+            let delta = filtered - last
             return delta == .zero ? [] : [.continuous(.scroll, phase: .changed, delta: delta)]
 
         case .dragging:
@@ -114,7 +123,8 @@ public struct TouchRecognizer {
         lostSince = since
         switch state {
         case .hover:
-            return lift()
+            // One blurred frame shouldn't stop the pointer; a hand that's really gone lifts after `grace`.
+            return t - since > grace ? lift() : []
         case .pressed:
             state = .hover // no click from a pinch we lost sight of
             return []

@@ -15,6 +15,8 @@ public struct TouchConfig: Sendable {
     public var doubleTapDistance: Float = 0.02
     public var anchorLookback: Double = 0.12
     public var historyWindow: Double = 0.15
+    /// While scrolling, knuckle jitter within this radius (frame heights) is ignored, so a held scroll stays put.
+    public var scrollDeadband: Float = 0.003
 
     public init() {}
 

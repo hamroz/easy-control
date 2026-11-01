@@ -1,4 +1,6 @@
 import Testing
+import HandTracking
+import TestSupport
 @testable import GestureEngine
 
 private let open = PinchReading(index: false, middle: false, ratio: 0.6)
@@ -92,7 +94,7 @@ private struct Feed {
         if case .continuous(_, let p, let d) = e, p == .began || p == .changed { return sum + d.y }
         return sum
     }
-    #expect(abs(total - 0.05) < 1e-4) // from where the pinch closed (0.51): earlier motion already moved the pointer
+    #expect(abs(total - 0.047) < 1e-4) // from where the pinch closed (0.51), minus the 0.003 scroll dead-band slack
 }
 
 @Test func holdThenMoveDrags() {
@@ -131,4 +133,48 @@ private struct Feed {
     f.frames(10, [0.5, 0.5], closed())                            // 0.33 s: too long to tap, too short to drag
     f.frame([0.5, 0.5], open)
     #expect(f.buttons.isEmpty)
+}
+
+@Test func lateDriftAfterHoldTimeIsNeverADeadPress() {
+    // The frame that first exceeds the slop arrives after the hold time (e.g. a 15 fps frame gap).
+    var r = TouchRecognizer(config: .default, gesture: .default)
+    var events = r.update(anchor: [0.5, 0.5], pinch: open, at: 0)
+    events += r.update(anchor: [0.5, 0.5], pinch: closed(), at: 0.033)
+    events += r.update(anchor: [0.505, 0.5], pinch: closed(), at: 0.3)
+    events += r.update(anchor: [0.53, 0.5], pinch: closed(), at: 0.5)   // past 0.4 s and past the slop at once
+    events += r.update(anchor: [0.56, 0.5], pinch: closed(), at: 0.533)
+    events += r.update(anchor: [0.56, 0.5], pinch: open, at: 0.566)
+    let acted = events.contains { e in
+        switch e {
+        case .button(.left, .down, _), .continuous(.scroll, .began, _): return true
+        default: return false
+        }
+    }
+    #expect(acted)
+    #expect(!r.isBusy)
+}
+
+@Test func singleDroppedFrameInHoverDoesNotLift() {
+    var f = Feed()
+    f.frame([0.5, 0.5], open)
+    f.frame(nil, nil)                                          // one blurred frame
+    f.frame([0.51, 0.5], open)
+    #expect(!f.events.contains(.pointerLift))
+}
+
+@Test func heldScrollDoesNotJiggle() {
+    var f = Feed()
+    f.frame([0.5, 0.5], open)
+    for i in 1...3 { f.frame([0.5, 0.5 + 0.01 * Float(i)], closed()) }   // scrolling
+    for i in 0..<10 { f.frame([0.5, 0.53 + (i % 2 == 0 ? 0.003 : -0.003)], closed()) } // holding still, raw noise
+    let afterHold = f.scrolls.suffix(10).filter { if case .continuous(_, .changed, _) = $0 { return true }; return false }
+    #expect(afterHold.count <= 1)
+}
+
+@Test func unreadableMiddleTipReleasesRightPress() {
+    var d = PinchDetector(config: .default)
+    _ = d.update(SyntheticHand.make(.pinchMiddle, pinchOpenness: 0), at: 0)
+    var blurred = SyntheticHand.make(.pinchMiddle, pinchOpenness: 0)
+    blurred[.middleTip].confidence = 0.1
+    #expect(d.update(blurred, at: 0.033)?.middle == false)
 }

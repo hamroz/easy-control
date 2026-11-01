@@ -40,6 +40,8 @@ public struct PinchDetector {
         index = index ? indexRatio <= config.openRatio : indexRatio < config.closeRatio && extended
         if let middleRatio = ratio(.middleTip) {
             middle = middle ? middleRatio <= config.openRatio : middleRatio < config.closeRatio
+        } else {
+            middle = false // an unreadable middle tip must not hold a right press forever
         }
         // A thumb on the index is never also a right click.
         let reading = PinchReading(index: index, middle: middle && !index, ratio: indexRatio)
