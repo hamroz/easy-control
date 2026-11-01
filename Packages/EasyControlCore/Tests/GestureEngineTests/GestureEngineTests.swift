@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 import HandTracking
 import Signal
@@ -117,6 +118,7 @@ private func engagedScript() -> FrameScript {
 @Test func recordingReplayMatchesGolden() throws {
     var s = engagedScript()
     s.move(.openPalm, from: [0.5, 0.5], to: [0.4, 0.5], over: 0.2)
+    s.hold(.openPalm, at: [0.4, 0.5], for: 0.2)          // aiming: the hand settles before the tap
     s.hold(.pinch, at: [0.4, 0.5], for: 0.13)
     s.hold(.openPalm, at: [0.4, 0.5], for: 0.2)
     s.hold(.pinch, at: [0.4, 0.5], for: 0.1)
@@ -143,4 +145,33 @@ private func engagedScript() -> FrameScript {
     s.empty(for: 1.2)
     let events = run(s.frames)
     #expect(buttons(events).isEmpty && scrollEvents(events).isEmpty)
+}
+
+@Test func restlessHandWithoutPointingPoseLetsEngagementLapse() {
+    var s = engagedScript()
+    for i in 0..<180 { // 6 s of a relaxed hand drifting around (rules read it as fist/none, not a pointing pose)
+        let x = 0.5 + 0.08 * Float(sin(Double(i) / 6))
+        s.appendFrame([SyntheticHand.make(.fist, center: [x, 0.5])])
+    }
+    #expect(run(s.frames).contains(.engagement(.standby)))
+}
+
+@Test func engagedReplayCountsWhatAnEngagedHandWouldDo() {
+    var s = FrameScript()
+    s.hold(.pinch, at: [0.5, 0.5], for: 0.3)            // never engaged by a palm…
+    s.hold(.openPalm, at: [0.5, 0.5], for: 0.6)
+    s.hold(.pinch, at: [0.5, 0.5], for: 0.13)
+    s.hold(.openPalm, at: [0.5, 0.5], for: 0.3)
+    let stats = ReplayBenchmark.run(s.frames, engine: GestureEngine(), forceEngaged: true) // …but treated as engaged
+    #expect(stats.clicks == 1)
+}
+
+@Test func doubleTapNeedsNoRePresenting() {
+    var s = engagedScript()
+    s.hold(.pinch, at: [0.5, 0.5], for: 0.1)
+    s.hold(.openPalm, at: [0.5, 0.5], for: 0.13) // too short for the classifier to see a palm again
+    s.hold(.pinch, at: [0.5, 0.5], for: 0.1)
+    s.hold(.openPalm, at: [0.5, 0.5], for: 0.3)
+    let counts = buttons(run(s.frames)).compactMap { e -> Int? in if case .button(.left, .click(let c), _) = e { return c }; return nil }
+    #expect(counts == [1, 2])
 }

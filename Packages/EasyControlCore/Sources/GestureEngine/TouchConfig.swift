@@ -17,6 +17,10 @@ public struct TouchConfig: Sendable {
     public var historyWindow: Double = 0.15
     /// While scrolling, knuckle jitter within this radius (frame heights) is ignored, so a held scroll stays put.
     public var scrollDeadband: Float = 0.003
+    /// A press needs a steady hand: knuckle speed over `steadyWindow` before the pinch closes stays below this
+    /// (frame heights/s). Aiming slows the hand; thumb meeting index mid-gesture while talking doesn't.
+    public var pressMaxSpeed: Float = 0.35
+    public var steadyWindow: Double = 0.15
 
     public init() {}
 

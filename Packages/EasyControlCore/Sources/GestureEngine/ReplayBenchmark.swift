@@ -14,10 +14,14 @@ public struct ReplayStats: Sendable, Equatable {
 
 /// Replays a landmark recording through the engine and counts what it would have done.
 public enum ReplayBenchmark {
-    public static func run(_ frames: [HandFrame], engine: GestureEngine) -> ReplayStats {
+    /// - Parameter forceEngaged: treat any visible hand as engaged (whenever the engine isn't), to measure what an
+    ///   engaged hand that isn't trying to do anything would trigger.
+    public static func run(_ frames: [HandFrame], engine: GestureEngine, forceEngaged: Bool = false) -> ReplayStats {
         var stats = ReplayStats(duration: 0, engagements: 0, discreteEvents: 0, scrollsBegan: 0, actionsPerHour: 0)
         for frame in frames {
-            for event in engine.process(frame, lastUserInput: nil) {
+            let events = engine.process(frame, lastUserInput: nil)
+            if forceEngaged { engine.forceEngageLargestHand(at: frame.timestamp) }
+            for event in events {
                 switch event {
                 case .engagement(.engaged): stats.engagements += 1
                 case .discrete: stats.discreteEvents += 1

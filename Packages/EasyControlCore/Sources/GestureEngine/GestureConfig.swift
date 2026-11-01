@@ -12,7 +12,7 @@ public struct GestureConfig: Sendable {
     public var resumeHold: Double = 0.15
     /// …by a hand that changed pose: to another gesture, or relaxed for at least this long.
     public var resumeRelax: Double = 0.2
-    public var idleTimeout: Double = 8.0
+    public var idleTimeout: Double = 4.0
     public var handLostTimeout: Double = 1.0
     public var inputSuppression: Double = 0.5
     public var discreteCooldown: Double = 0.4
@@ -44,8 +44,13 @@ public struct GestureConfig: Sendable {
     public var threeWindow: Double = 0.15
     public var threeEnter: Float = 0.7
     public var threeExit: Float = 0.5
-    /// Pointer movement (frame heights) that counts as activity, keeping engagement alive.
+    /// Pointer movement (frame heights) that counts as activity — only while the hand is clearly pointing.
     public var pointerActivityDistance: Float = 0.02
+    /// A press needs the hand to have shown a pointing or pinch pose within this window (intent evidence).
+    public var presentedWindow: Double = 0.3
+    /// …or to have made an intentional touch (click, scroll, drag) within this window: follow-up taps and
+    /// double-clicks don't need the hand re-presented.
+    public var touchIntentWindow: Double = 2.0
 
     public init() {}
 

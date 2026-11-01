@@ -40,8 +40,9 @@ public struct TouchRecognizer {
     ///     must not see smoothing lag; nil when the hand isn't tracked this frame.
     ///   - pointer: the smoothed knuckle reported for the pointer (defaults to `anchor`).
     ///   - pinch: the pinch reading, or nil when the fingertips can't be read.
+    ///   - presented: the hand recently showed a pointing or pinch pose (the engine's intent evidence).
     public mutating func update(anchor: SIMD2<Float>?, pointer: SIMD2<Float>? = nil, pinch: PinchReading?,
-                                at t: Double) -> [GestureEvent] {
+                                presented: Bool = true, at t: Double) -> [GestureEvent] {
         guard let anchor, let pinch else { return lost(at: t, unreadable: anchor != nil) }
         let pointer = pointer ?? anchor
         lostSince = nil
@@ -51,7 +52,13 @@ public struct TouchRecognizer {
         switch state {
         case .hover:
             if !pinch.index && !pinch.middle { armed = true }
-            if armed, pinch.index || pinch.middle {
+            if pinch.index || pinch.middle {
+                // A press needs intent: armed (seen open first), a presented hand, and a steady, aiming hand.
+                guard armed, presented, steady(at: t) else {
+                    armed = false // a pinch that closed without intent must open again before it can press
+                    tracking = true
+                    return [.pointerTrack(position: pointer, at: t)]
+                }
                 state = .pressed(start: t, contact: anchor, anchorTime: pressAnchorTime(at: t), button: pinch.index ? .left : .right)
                 return lift()
             }
@@ -149,6 +156,13 @@ public struct TouchRecognizer {
             start -= 1
         }
         return start >= 0 && start < history.count ? history[start].t : t
+    }
+
+    /// Knuckle speed over the last `steadyWindow` (raw positions) is below `pressMaxSpeed`.
+    private func steady(at t: Double) -> Bool {
+        let window = history.filter { t - $0.t <= config.steadyWindow + 1e-9 }
+        guard let first = window.first, let last = window.last, last.t > first.t else { return true }
+        return Self.length(last.anchor - first.anchor) / Float(last.t - first.t) < config.pressMaxSpeed
     }
 
     private mutating func clickCount(at t: Double, position: SIMD2<Float>, button: MouseButton) -> Int {

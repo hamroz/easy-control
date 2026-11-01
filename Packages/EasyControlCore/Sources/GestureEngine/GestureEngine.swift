@@ -38,6 +38,11 @@ public final class GestureEngine {
     private var threeOn = false
     private var touchHand: HandID?
     private var activityAnchor: SIMD2<Float>?
+    private var pointing = false
+    private var lastPresented: Double = -.infinity
+    private var lastTouch: Double = -.infinity
+    private static let pointingPoses: Set<PoseClass> = [.openPalm, .point]
+    private static let presentedPoses: Set<PoseClass> = [.openPalm, .point, .ok, .pinch]
     /// Exclusive lock: after a scroll or drag ends, nothing else starts until then.
     private var settleUntil: Double = -.infinity
     private var lastTimestamp: Double = 0
@@ -108,6 +113,9 @@ public final class GestureEngine {
         }
         let reliable = hand?.features.isReliable == true
         let aspect = hand?.hand.aspectRatio ?? 1
+        let pose = hand?.pose ?? .none
+        pointing = reliable && Self.pointingPoses.contains(pose)
+        if reliable, Self.presentedPoses.contains(pose) { lastPresented = t }
         let center = reliable ? hand?.features.palmCenter : nil
 
         threeEvidence.append((t, reliable ? hand?.probabilities[.three] ?? 0 : 0))
@@ -125,7 +133,12 @@ public final class GestureEngine {
             let anchor: SIMD2<Float>? = reliable ? hand.map { HandNormalizer.isotropic($0.rawHand, .indexMCP) } : nil
             let pointer: SIMD2<Float>? = reliable ? hand.map { HandNormalizer.isotropic($0.hand, .indexMCP) } : nil
             let reading = hand.flatMap { pinch.update($0.rawHand, at: t) }
-            events += touch.update(anchor: anchor, pointer: pointer, pinch: reading, at: t)
+            let presented = t - lastPresented <= config.presentedWindow || t - lastTouch <= config.touchIntentWindow
+            let touchEvents = touch.update(anchor: anchor, pointer: pointer, pinch: reading, presented: presented, at: t)
+            if touchEvents.contains(where: { if case .pointerTrack = $0 { return false }; if case .pointerLift = $0 { return false }; return true }) {
+                lastTouch = t
+            }
+            events += touchEvents
         }
         if events.contains(where: Self.endsContinuous) { settleUntil = t + config.continuousSettle }
         return events
@@ -134,6 +147,19 @@ public final class GestureEngine {
     private static func endsContinuous(_ e: GestureEvent) -> Bool {
         if case .continuous(_, let phase, _) = e { return phase == .ended || phase == .cancelled }
         return false
+    }
+
+    /// Replay benchmarks: engage the largest visible hand, as if the user had engaged it.
+    func forceEngageLargestHand(at t: Double) {
+        guard case .idle = engagement.state, let hand = snapshot.hands.max(by: { $0.features.palmSize < $1.features.palmSize })
+        else { if case .standby = engagement.state, let hand = snapshot.hands.first { force(hand, at: t) }; return }
+        force(hand, at: t)
+    }
+
+    private func force(_ hand: HandDebugInfo, at t: Double) {
+        engagement.forceEngage(HandObservation(id: hand.id, pose: hand.pose, palmSize: hand.features.palmSize,
+                                               palmCenter: hand.features.palmCenter, reliable: hand.features.isReliable), at: t)
+        snapshot.state = engagement.state
     }
 
     public func setPaused(_ paused: Bool, at t: Double) -> [GestureEvent] {
@@ -151,6 +177,7 @@ public final class GestureEngine {
         switch e {
         case .discrete, .continuous, .button: return true
         case .pointerTrack(let position, _):
+            guard pointing else { return false } // a restless hand isn't using the pointer
             guard let last = activityAnchor else {
                 activityAnchor = position
                 return false

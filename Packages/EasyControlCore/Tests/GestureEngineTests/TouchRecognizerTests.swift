@@ -178,3 +178,23 @@ private struct Feed {
     blurred[.middleTip].confidence = 0.1
     #expect(d.update(blurred, at: 0.033)?.middle == false)
 }
+
+@Test func pinchWhileMovingFastDoesNotPress() {
+    // Gesturing while talking: thumb meets index mid-motion.
+    var r = TouchRecognizer(config: .default, gesture: .default)
+    var events: [GestureEvent] = []
+    for i in 0..<12 {
+        let x = 0.4 + 0.03 * Float(i)                              // 0.9 frame heights/s
+        let reading = (6...7).contains(i) ? closed() : open
+        events += r.update(anchor: [x, 0.5], pinch: reading, at: Double(i) / 30)
+    }
+    #expect(!events.contains { if case .button = $0 { return true }; if case .continuous(.scroll, _, _) = $0 { return true }; return false })
+}
+
+@Test func pinchWithoutPresentedHandDoesNotPress() {
+    var r = TouchRecognizer(config: .default, gesture: .default)
+    var events = r.update(anchor: [0.5, 0.5], pinch: open, presented: false, at: 0)
+    events += r.update(anchor: [0.5, 0.5], pinch: closed(), presented: false, at: 0.033)
+    events += r.update(anchor: [0.5, 0.5], pinch: open, presented: false, at: 0.1)
+    #expect(!events.contains { if case .button = $0 { return true }; return false })
+}

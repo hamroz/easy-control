@@ -47,12 +47,12 @@ private func feed(_ c: inout EngagementController, _ hands: [HandObservation], f
 @Test func idleTimeoutEntersStandby() {
     var c = EngagementController(config: .default)
     let t = feed(&c, [obs(.openPalm)], from: 0, for: 0.5)
-    feed(&c, [obs(.openPalm)], from: t, for: 8.1)
+    feed(&c, [obs(.openPalm)], from: t, for: 4.1)
     #expect(c.state == .standby)
 
     var d = EngagementController(config: .default)
     var u = feed(&d, [obs(.openPalm)], from: 0, for: 0.5)
-    u = feed(&d, [obs(.openPalm)], from: u, for: 6.0)
+    u = feed(&d, [obs(.openPalm)], from: u, for: 3.0)
     d.noteActivity(at: u)
     feed(&d, [obs(.openPalm)], from: u, for: 3.0)
     #expect(d.state == .engaged(hand: 1, mode: .command))

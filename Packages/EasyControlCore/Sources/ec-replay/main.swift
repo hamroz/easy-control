@@ -45,6 +45,10 @@ if args.contains("--pinch-stats") {
     exit(0)
 }
 
+// --engaged: treat any visible hand as engaged, to count what an engaged-but-idle hand would trigger.
+let forceEngaged = args.contains("--engaged")
+args.removeAll { $0 == "--engaged" }
+
 let poseMode = args.contains("--poses")
 args.removeAll { $0 == "--poses" }
 // --segment test: replay only the held-out part of each recording (the part never used for training).
@@ -95,7 +99,7 @@ print("recording | minutes | engagements | discrete | scrolls+dock | clicks | dr
 var totalDuration = 0.0, totalActions = 0
 for path in args {
     let frames = try load(path, segment: segment)
-    let s = ReplayBenchmark.run(frames, engine: GestureEngine(classifier: classifier))
+    let s = ReplayBenchmark.run(frames, engine: GestureEngine(classifier: classifier), forceEngaged: forceEngaged)
     totalDuration += s.duration
     totalActions += s.discreteEvents + s.scrollsBegan + s.clicks + s.drags
     print("\((path as NSString).lastPathComponent) | \(String(format: "%.1f", s.duration / 60)) | \(s.engagements) | \(s.discreteEvents) | \(s.scrollsBegan) | \(s.clicks) | \(s.drags) | \(String(format: "%.1f", s.actionsPerHour))")

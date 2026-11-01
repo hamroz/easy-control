@@ -40,8 +40,8 @@ public struct HandObservation: Sendable {
 public struct EngagementController {
     /// Poses that wake the engine from idle (open palm, or three fingers held briefly).
     private static let wakePoses: Set<PoseClass> = [.openPalm, .three]
-    /// Poses that resume from standby: a raised hand, ready to point or pinch.
-    private static let gesturePoses: Set<PoseClass> = [.openPalm, .three, .ok, .pinch]
+    /// Poses that resume from standby: a clearly raised, pointing hand (not OK/pinch, which a resting hand mimics).
+    private static let gesturePoses: Set<PoseClass> = [.openPalm, .three, .point]
 
     private let config: GestureConfig
     public private(set) var state: EngagementState = .idle
@@ -185,6 +185,11 @@ public struct EngagementController {
         lastActivity = t
         lastPose = hand.pose
         return state
+    }
+
+    /// Replay benchmarks: treat `hand` as engaged now (what the engine would do once the user had engaged).
+    mutating func forceEngage(_ hand: HandObservation, at t: Double) {
+        _ = engage(hand, at: t)
     }
 
     /// A recognized gesture keeps engagement alive.
