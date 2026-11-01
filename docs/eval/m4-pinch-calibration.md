@@ -24,6 +24,28 @@ Findings:
   intent has to come from engagement: clicks only while engaged, a pinch must be seen open before it can press,
   and typing suppresses everything. The OK sign reads as a pinch, which is acceptable (it is one).
 
+## Replay gate, engaged (re-run 2026-11-02 after the intent gate)
+
+The gate below this one never engaged on the held-out segment, so it exercised no touch logic at all. `ec-replay
+--engaged` forces engagement on the largest hand at the start of each recording (and whenever engagement lapses),
+which is the worst case: every frame of an idle or talking hand is treated as if the user had engaged.
+
+| Recording (whole file, Core ML) | Minutes | Clicks | Drags | Scrolls / Dock | Note |
+|---|---|---|---|---|---|
+| normal use | 10.2 | 0 | 0 | 0 | |
+| none | 0.7 | 0 | 0 | 0 | |
+| point | 0.7 | 0 | 0 | 0 | pointing, no pinch |
+| fist | 0.6 | 0 | 0 | 0 | |
+| two, thumbs up | ≤ 0.6 each | 0 | 0 | 0 | |
+| open palm | 0.7 | 0 | 0 | 1 | |
+| ok | 0.6 | 0 | 1 | 4 | the OK sign is a pinch: expected |
+| three | 0.7 | 0 | 0 | 7 | three fingers are the Dock gesture: expected |
+
+With the rule-based fallback classifier, the `point` recording produced 2 clicks (normal use and none: 0). Before
+the intent gate (presses need a presented, steady hand; engagement renewed only by pointing or touching), an
+independent review measured 3 clicks + 12 scrolls on `none` and 2 clicks + 20 scrolls on normal use in this mode.
+Ten minutes is still short of the hour the < 1 action/hour target needs.
+
 ## Replay gate (held-out last 25 % of the normal-use recording, 2.5 min, no typing suppression applied)
 
 | Classifier | Engagements | Clicks | Drags | Scrolls / Dock | Actions per hour |

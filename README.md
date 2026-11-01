@@ -12,8 +12,8 @@ Camera ─► Vision hand pose ─► Signal (One Euro smoothing, normalization,
        ─► Actions (CGEvent scroll with momentum, Ctrl+Arrow Space switching)
 ```
 
-- **Engagement gate:** gestures only count after you hold an open palm (or three fingers) for 0.3 s. When your hand leaves or rests, EasyControl waits in standby for 15 s and a raised hand resumes instantly. Any keyboard/mouse input pauses gestures for 0.5 s.
-- **Smooth output:** the camera delivers 30 frames a second; a display-synced output loop predicts and smooths the hand between frames, so the pointer, scrolling and the Dock move every display frame.
+- **Engagement gate:** gestures only count after you hold an open palm (or three fingers) for 0.3 s. When your hand leaves or rests, EasyControl waits in standby for 15 s, and an open palm, pointing finger or three fingers resumes it within 0.15 s. Clicks and scrolls need a hand that is presented (pointing, open or pinching) and steady, so a hand resting or talking in view does nothing. Any keyboard/mouse input pauses gestures for 0.5 s.
+- **Smooth output:** the camera delivers 30 frames a second; a display-synced output loop predicts and smooths the hand between frames, so the pointer, scrolling and the Dock move every display frame (tested with simulated camera latency; end-to-end latency on real hardware is not measured yet).
 - **Pinch from geometry:** thumb-to-index distance relative to hand size (plus a minimum index reach that rejects fists), not the pose classifier — reliable and fast. Clicks land where the pointer was when your fingers started closing.
 - **Deterministic core:** the engine takes landmark sequences and timestamps only, so recorded sessions replay in unit tests.
 - **Privacy:** frames are processed in memory; pausing (or locking the screen / sleeping) stops the camera.

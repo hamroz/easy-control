@@ -26,10 +26,7 @@ Open **Debug Window…** from the menu-bar hand icon for every step below.
 - [ ] Hand down for > 1 s → `idle`. Palm held still for 3 s → `idle`, and it does not re-engage until the palm is lowered and raised again.
 
 ## 4. Gestures (engaged)
-- [ ] Two fingers (V) up, move hand up/down in Safari → page scrolls; direction feels natural; flick → momentum.
-- [ ] Same in Finder and Xcode.
-- [ ] Quick open-palm swipe left/right → Space switches left/right.
-- [ ] Swipe up → Mission Control opens; swipe down → App Exposé. (Not verifiable headlessly.)
+- [ ] ~~Two-finger scroll and open-palm swipes~~ — replaced in M4 by pinch-scroll and three-finger swipes (6a, 6b).
 - [ ] Slow hand drift does not swipe. Talking with hands while engaged produces no swipes.
 - [ ] Swipe, then bring the hand back to centre → exactly one Space switch (the return stroke is locked out for 1 s).
 - [ ] Engage, then lower the open hand to your lap → nothing fires. (Residual risk: if the lowered hand stays fully visible and open, it can still read as swipe-down; note how often.)
@@ -60,6 +57,9 @@ Open **Debug Window…** from the menu-bar hand icon for every step below.
 - [ ] Touch, hold still ~0.4 s (ring turns bold), move → drags/selects; release → drop. Hand out of view mid-drag → button released.
 - [ ] Type with a hand visible → no clicks or pointer movement; touching the trackpad mid-scroll stops it.
 - [ ] Make a fist with the thumb on the index while engaged → no click.
+- [ ] Engaged, then rest the hand or talk with it (no pointing, no open palm) → no clicks or scrolls; after ~4 s the ring disappears (standby).
+- [ ] Pinch while moving the hand fast → no click (presses need a steady hand).
+- [ ] Revoke Accessibility mid-scroll (System Settings) → scrolling stops; re-grant → the next gesture starts clean.
 - [ ] Three fingers drag still moves Spaces / Mission Control.
 - [ ] Debug panel: latency p95 ____ ms; Activity Monitor CPU while pointing ____ %.
 
@@ -67,7 +67,7 @@ Open **Debug Window…** from the menu-bar hand icon for every step below.
 - [ ] Three fingers up, drag left/right slowly: the Spaces strip follows your hand; release (change pose) past halfway → it commits; release early → it snaps back.
 - [ ] Quick three-finger flick left/right: commits by velocity, like a trackpad.
 - [ ] Three fingers drag **up**: Mission Control follows and opens. If up/down are inverted, note it (vertical sign is a constant in `DockSwipeInjector`).
-- [ ] Move the hand out of view for 5 s, bring it back with two fingers: scrolling works immediately (standby). After 20 s away, an open palm hold (or two/three fingers for 0.3 s) is needed.
+- [ ] Move the hand out of view for 5 s, bring it back as an open palm, pointing finger or three fingers: it resumes within ~0.15 s (standby). After 20 s away, an open palm (or three fingers) held 0.3 s is needed.
 - [ ] Hold a palm still for 10 s: no flicker between engaged and standby.
 
 ## 7. Learned classifier (M3)
