@@ -50,11 +50,23 @@ Open **Debug Window…** from the menu-bar hand icon for every step below.
 - [ ] Lock screen (⌃⌘Q) → camera light off; unlock → tracking resumes.
 - [ ] Close the lid / sleep → resumes after wake.
 
+## 6a. Touch & Smooth (M4)
+- [ ] Raise an open hand ~0.3 s → ring appears around the cursor; the pointer follows the hand smoothly (no 30 fps stepping on the 120 Hz display).
+- [ ] Hold the hand still: the pointer does not creep or wobble.
+- [ ] Slow hand movement = precise; fast movement crosses the screen.
+- [ ] Quick thumb+index touch on a button → clicks exactly where the pointer was before the fingers closed.
+- [ ] Two quick touches on a word → double-click selects it. Thumb+middle touch → context menu.
+- [ ] Touch and move up/down in a web page → content follows the hand; release mid-motion → coasts with momentum.
+- [ ] Touch, hold still ~0.4 s (ring turns bold), move → drags/selects; release → drop. Hand out of view mid-drag → button released.
+- [ ] Type with a hand visible → no clicks or pointer movement; touching the trackpad mid-scroll stops it.
+- [ ] Make a fist with the thumb on the index while engaged → no click.
+- [ ] Three fingers drag still moves Spaces / Mission Control.
+- [ ] Debug panel: latency p95 ____ ms; Activity Monitor CPU while pointing ____ %.
+
 ## 6b. Trackpad feel (M3.5)
 - [ ] Three fingers up, drag left/right slowly: the Spaces strip follows your hand; release (change pose) past halfway → it commits; release early → it snaps back.
 - [ ] Quick three-finger flick left/right: commits by velocity, like a trackpad.
 - [ ] Three fingers drag **up**: Mission Control follows and opens. If up/down are inverted, note it (vertical sign is a constant in `DockSwipeInjector`).
-- [ ] Left/right open-palm swipes now work as easily as up/down (16:9 fix).
 - [ ] Move the hand out of view for 5 s, bring it back with two fingers: scrolling works immediately (standby). After 20 s away, an open palm hold (or two/three fingers for 0.3 s) is needed.
 - [ ] Hold a palm still for 10 s: no flicker between engaged and standby.
 

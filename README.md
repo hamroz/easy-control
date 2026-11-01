@@ -2,7 +2,7 @@
 
 Control your Mac with hand gestures through the built-in camera. Everything runs on-device: Apple Vision finds 21 hand landmarks per hand, and EasyControl's own gesture engine turns them into scrolling, Space switching and Mission Control — no cloud, no LLM, no frames ever stored.
 
-> **Status: M3.5.** Engage with an open palm (or two/three fingers), scroll with two fingers, and drag three fingers to move between Spaces or pull open Mission Control — the Dock follows your hand like a trackpad. Poses are recognized by EasyControl's own Core ML classifier (94.3 % end to end on people it has never seen; when it acts on a gesture it is right 97.8 % of the time). Cursor mode (M4) and custom gestures (M5) are next. See the [design spec](docs/superpowers/specs/2026-10-29-easycontrol-design.md).
+> **Status: M4 — Touch & Smooth.** Raise your hand and the pointer follows it like a trackpad; touch thumb and index to click, pinch and move to scroll, pinch and hold to drag. Three fingers move between Spaces and open Mission Control, with the Dock following your hand. Everything renders at the display's refresh rate (120 Hz on ProMotion), not the camera's 30 fps.
 
 ## How it works
 
@@ -12,16 +12,22 @@ Camera ─► Vision hand pose ─► Signal (One Euro smoothing, normalization,
        ─► Actions (CGEvent scroll with momentum, Ctrl+Arrow Space switching)
 ```
 
-- **Engagement gate:** gestures only count after you hold an open palm for 0.4 s (or two/three fingers for 0.3 s). When your hand leaves or goes quiet, EasyControl waits in standby for 15 s, and any gesture pose resumes instantly. Any keyboard/mouse input pauses gestures for 0.5 s.
+- **Engagement gate:** gestures only count after you hold an open palm (or three fingers) for 0.3 s. When your hand leaves or rests, EasyControl waits in standby for 15 s and a raised hand resumes instantly. Any keyboard/mouse input pauses gestures for 0.5 s.
+- **Smooth output:** the camera delivers 30 frames a second; a display-synced output loop predicts and smooths the hand between frames, so the pointer, scrolling and the Dock move every display frame.
+- **Pinch from geometry:** thumb-to-index distance relative to hand size (plus a minimum index reach that rejects fists), not the pose classifier — reliable and fast. Clicks land where the pointer was when your fingers started closing.
 - **Deterministic core:** the engine takes landmark sequences and timestamps only, so recorded sessions replay in unit tests.
 - **Privacy:** frames are processed in memory; pausing (or locking the screen / sleeping) stops the camera.
 
 | Gesture (after engaging) | Action |
 |---|---|
-| Two fingers up + move | Scroll (with momentum) |
-| **Three fingers + drag left / right** | Spaces strip follows your hand; release to commit or snap back (like the trackpad) |
-| **Three fingers + drag up / down** | Mission Control / App Exposé, following your hand |
-| Open palm quick swipe left / right / up / down | Space left/right, Mission Control, App Exposé (discrete) |
+| Move your raised hand | Pointer follows, like a trackpad (slow = precise, fast = across the screen) |
+| **Touch thumb + index briefly** | Click (twice = double-click) |
+| Touch thumb + middle briefly | Right-click |
+| **Touch thumb + index and move** | Scroll — the page follows your hand, with momentum |
+| Touch, hold still ~0.4 s, then move | Drag (select text, move windows) |
+| Three fingers + drag left / right / up / down | Spaces strip / Mission Control / App Exposé follow your hand; release to commit or snap back |
+
+A ring around the cursor shows what EasyControl sees: hovering, pressing, scrolling or dragging.
 
 Finger-following swipes use the Dock's own swipe event (private API, resolved at runtime; see [docs/spikes/m0-results.md](docs/spikes/m0-results.md) §5 and credit to [Grabby](https://github.com/govindup63/grabby)'s research). If it is unavailable on a future macOS, three-finger drags fall back to the keyboard shortcuts on release.
 
