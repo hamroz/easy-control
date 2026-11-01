@@ -33,6 +33,12 @@ public struct GestureConfig: Sendable {
     public var scrollDeadZone: Float = 0.004
     /// Three-finger drag: travel (frame heights) before the drag commits to horizontal or vertical.
     public var dockSwipeLock: Float = 0.03
+    /// Edge glide: the outer band of the camera view (fraction of width/height on each side) where a pointing
+    /// hand keeps the pointer gliding toward that edge, up to `glideMaxSpeed` screen heights per second at the
+    /// very edge, easing in over `glideRamp` seconds so a hand passing through barely moves it.
+    public var glideZone: Float = 0.15
+    public var glideMaxSpeed: Float = 1.5
+    public var glideRamp: Double = 0.25
     /// A running scroll / three-finger drag rides through this much missing or uncertain tracking.
     public var continuousGrace: Double = 0.2
     /// …and ends only after a different confident pose lasts this many frames.

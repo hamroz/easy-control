@@ -40,6 +40,12 @@ public enum GestureEvent: Equatable, Sendable {
     case pointerTrack(position: SIMD2<Float>, at: Double)
     /// The pointer stops following the hand (press, hand lost): output must not extrapolate further.
     case pointerLift
+    /// Fist: the pointer stays where it is while the hand moves (a mouse picked up); tracking resumes,
+    /// relative to wherever the hand is then, on the next `pointerTrack`.
+    case pointerRest
+    /// Edge glide: keep moving the pointer at `velocity` screen heights per second (+y down) until renewed or
+    /// stopped by a zero velocity. Camera time `at`.
+    case pointerGlide(velocity: SIMD2<Float>, at: Double)
     /// A mouse button action. Clicks and presses happen where the pointer was at `anchorTime`, before the
     /// closing fingers dragged it.
     case button(MouseButton, ButtonAction, anchorTime: Double)

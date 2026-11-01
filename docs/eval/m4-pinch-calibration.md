@@ -41,6 +41,10 @@ which is the worst case: every frame of an idle or talking hand is treated as if
 | ok | 0.6 | 0 | 1 | 4 | the OK sign is a pinch: expected |
 | three | 0.7 | 0 | 0 | 7 | three fingers are the Dock gesture: expected |
 
+Edge glide (added 2026-11-02): 0 glides in every recording above, forced engagement included, although the index
+knuckle is inside the 15 % edge band in 61 % of normal-use frames (mostly a low hand at the bottom of the view):
+a hand only glides while open or pointing, and only after it has been in the middle of the view.
+
 With the rule-based fallback classifier, the `point` recording produced 2 clicks (normal use and none: 0). Before
 the intent gate (presses need a presented, steady hand; engagement renewed only by pointing or touching), an
 independent review measured 3 clicks + 12 scrolls on `none` and 2 clicks + 20 scrolls on normal use in this mode.

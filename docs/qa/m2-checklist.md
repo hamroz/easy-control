@@ -61,6 +61,10 @@ Open **Debug Window…** from the menu-bar hand icon for every step below.
 - [ ] Pinch while moving the hand fast → no click (presses need a steady hand).
 - [ ] Revoke Accessibility mid-scroll (System Settings) → scrolling stops; re-grant → the next gesture starts clean.
 - [ ] Three fingers drag still moves Spaces / Mission Control.
+- [ ] Edge glide: from the top-right corner, move the open hand to the left edge of the camera view and hold → the pointer glides left, speeding up the closer to the edge; back toward the middle → stops. Reaches the top-left corner without the hand leaving the view.
+- [ ] Hand comes back into view at the edge → no glide until it has been in the middle.
+- [ ] Pinch-drag a window toward the edge of the view and hold → it keeps moving across the screen. Pinch-scroll at the edge → no glide.
+- [ ] Fist lift: make a fist (ring dims), move the fist back across the view, open the hand → the pointer stayed put and continues from there. A fist never clicks.
 - [ ] Debug panel: latency p95 ____ ms; Activity Monitor CPU while pointing ____ %.
 
 ## 6b. Trackpad feel (M3.5)

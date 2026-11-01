@@ -6,6 +6,8 @@ import Synchronization
 
 public enum OverlayMode: Sendable, Equatable {
     case hidden, hover, pressed, dragging, scrolling
+    /// Fist: the pointer is lifted and stays put while the hand moves.
+    case lifted
 }
 
 public struct OverlayState: Sendable, Equatable {
@@ -45,6 +47,12 @@ public final class OutputLoop {
     private var scrollEndedAt: Double?
     private var scrollEnding: Bool { scrollEndedAt != nil }
     private static let glideOut = 0.05
+    /// Edge glide in screen heights per second, and when it was last renewed (arrival time): a glide the
+    /// camera stops confirming ends after `glideStale`.
+    private var glide: SIMD2<Float> = .zero
+    private var glideRenewed: Double = -.infinity
+    private static let glideStale = 0.15
+    private var resting = false
     private var lastStep: Double?
     private var leftDown = false
     private var engaged = false
@@ -65,7 +73,7 @@ public final class OutputLoop {
 
     /// Something still needs display frames: pointer tracking, pending deltas, momentum, Dock re-sends, a held button.
     public var needsFrames: Bool {
-        followed != nil || !scrollSmoother.isEmpty || !dockSmoother.isEmpty || scrollEnding || scroll.isMomentumActive
+        followed != nil || glide != .zero || !scrollSmoother.isEmpty || !dockSmoother.isEmpty || scrollEnding || scroll.isMomentumActive
             || dock.isActive || dock.needsTicks || leftDown
     }
 
@@ -84,6 +92,7 @@ public final class OutputLoop {
         for event in events {
             switch event {
             case let .pointerTrack(raw, time):
+                resting = false
                 if followed == nil {
                     predictor.reset()
                     deadband.reset()
@@ -96,8 +105,19 @@ public final class OutputLoop {
             case .pointerLift:
                 if followed != nil { pressHistory = history }
                 followed = nil
+                glide = .zero
                 predictor.reset()
                 deadband.reset()
+            case .pointerRest:
+                resting = true
+                followed = nil
+                glide = .zero
+                pressHistory = nil
+                predictor.reset()
+                deadband.reset()
+            case let .pointerGlide(velocity, _):
+                glide = velocity
+                glideRenewed = arrival ?? t
             case let .button(button, action, anchorTime):
                 let target = action == .up ? pointer : (Self.lookup(anchorTime, in: pressHistory ?? history) ?? pointer)
                 press(button, action, at: target)
@@ -119,15 +139,22 @@ public final class OutputLoop {
         let dt = lastStep.map { min(max(now - $0, 0), 0.1) } ?? 1.0 / 120
         lastStep = now
 
+        var px = SIMD2<Double>.zero
         if let current = followed, let target = predictor.sample(at: now) {
             let next = current + (target - current) * Float(1 - exp(-dt / followTau))
             followed = next
             let handDelta = next - current
             let speed = Double((handDelta * handDelta).sum().squareRoot()) / max(dt, 1e-4)
-            let px = mapper.pixels(handDelta: handDelta, speed: speed, screenHeight: environment.screenHeight())
-            if abs(px.x) + abs(px.y) > 0.01 {
-                pointer = PointerMapper.clamp(CGPoint(x: pointer.x + px.x, y: pointer.y + px.y),
-                                              to: environment.displayFrames())
+            px = mapper.pixels(handDelta: handDelta, speed: speed, screenHeight: environment.screenHeight())
+        }
+        if glide != .zero, now - glideRenewed > Self.glideStale { glide = .zero }
+        if glide != .zero, followed != nil || leftDown {
+            px += SIMD2<Double>(Double(glide.x), Double(glide.y)) * environment.screenHeight() * dt
+        }
+        if abs(px.x) + abs(px.y) > 0.01 {
+            let next = PointerMapper.clamp(CGPoint(x: pointer.x + px.x, y: pointer.y + px.y), to: environment.displayFrames())
+            if next != pointer {
+                pointer = next
                 sink.post(.mouse(leftDown ? .leftDragged : .moved, x: pointer.x, y: pointer.y, clickCount: 1))
             }
         }
@@ -164,6 +191,8 @@ public final class OutputLoop {
         if let id = dockID { handleDock(id, .cancelled, delta: .zero, at: t) }
         dock.cancelActive(at: t)
         followed = nil
+        glide = .zero
+        resting = false
         predictor.reset()
         deadband.reset()
         updateOverlay()
@@ -206,6 +235,7 @@ public final class OutputLoop {
             }
             scrollSmoother.clear()
             scrollActive = true
+            glide = .zero
             scroll.handle(phase: .began, delta: .zero, at: t)
             scrollSmoother.add(SIMD2<Double>(Double(delta.x), Double(delta.y)))
         case .changed:
@@ -246,6 +276,7 @@ public final class OutputLoop {
         let mode: OverlayMode = if leftDown { .dragging }
             else if scrollActive || scrollEnding { .scrolling }
             else if followed != nil { .hover }
+            else if resting && engaged { .lifted }
             else if pressHistory != nil && engaged { .pressed } // a real press, not just a lost or idle hand
             else { .hidden }
         overlay = OverlayState(mode: mode, position: pointer)

@@ -7,6 +7,10 @@ public struct ReplayStats: Sendable, Equatable {
     public var scrollsBegan: Int
     public var clicks: Int = 0
     public var drags: Int = 0
+    /// Edge glides started and seconds spent gliding: pointer motion the hand didn't make directly (not counted
+    /// as actions, but a glide nobody meant is a pointer that wanders off).
+    public var glides: Int = 0
+    public var glideSeconds: Double = 0
     /// (discrete events + scrolls/Dock drags begun + clicks + drags) per hour. On a normal-use recording every
     /// action is a false one.
     public var actionsPerHour: Double
@@ -18,6 +22,7 @@ public enum ReplayBenchmark {
     ///   engaged hand that isn't trying to do anything would trigger.
     public static func run(_ frames: [HandFrame], engine: GestureEngine, forceEngaged: Bool = false) -> ReplayStats {
         var stats = ReplayStats(duration: 0, engagements: 0, discreteEvents: 0, scrollsBegan: 0, actionsPerHour: 0)
+        var glidingSince: Double?
         for frame in frames {
             let events = engine.process(frame, lastUserInput: nil)
             if forceEngaged { engine.forceEngageLargestHand(at: frame.timestamp) }
@@ -28,11 +33,17 @@ public enum ReplayBenchmark {
                 case .continuous(_, .began, _): stats.scrollsBegan += 1
                 case .button(_, .click, _): stats.clicks += 1
                 case .button(_, .down, _): stats.drags += 1
+                case .pointerGlide(let v, let t):
+                    if v != .zero, glidingSince == nil { glidingSince = t; stats.glides += 1 }
+                    if v == .zero, let since = glidingSince { stats.glideSeconds += t - since; glidingSince = nil }
                 default: break
                 }
             }
         }
-        if let first = frames.first, let last = frames.last { stats.duration = last.timestamp - first.timestamp }
+        if let first = frames.first, let last = frames.last {
+            stats.duration = last.timestamp - first.timestamp
+            if let since = glidingSince { stats.glideSeconds += last.timestamp - since }
+        }
         let actions = Double(stats.discreteEvents + stats.scrollsBegan + stats.clicks + stats.drags)
         stats.actionsPerHour = stats.duration > 0 ? actions / stats.duration * 3600 : 0
         return stats

@@ -110,6 +110,8 @@ struct DebugView: View {
         case .continuous(let id, let phase, _): "\(id.rawValue) \(phase.rawValue)"
         case .pointerTrack: "pointer"
         case .pointerLift: "pointer lifted"
+        case .pointerRest: "pointer resting (fist)"
+        case .pointerGlide(let v, _): v == .zero ? "glide stop" : "edge glide"
         case .button(let button, let action, _): "\(button) \(action)"
         case .engagement(let state): describe(state)
         }

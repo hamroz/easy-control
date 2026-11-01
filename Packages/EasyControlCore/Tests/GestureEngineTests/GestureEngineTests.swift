@@ -175,3 +175,89 @@ private func engagedScript() -> FrameScript {
     let counts = buttons(run(s.frames)).compactMap { e -> Int? in if case .button(.left, .click(let c), _) = e { return c }; return nil }
     #expect(counts == [1, 2])
 }
+
+// MARK: - Fist lift and edge glide
+
+private func glides(_ events: [GestureEvent]) -> [SIMD2<Float>] {
+    events.compactMap { if case .pointerGlide(let v, _) = $0 { return v }; return nil }
+}
+
+private func tracks(_ events: [GestureEvent]) -> [SIMD2<Float>] {
+    events.compactMap { if case .pointerTrack(let p, _) = $0 { return p }; return nil }
+}
+
+@Test func fistLiftsPointerAndOpenHandResumesWhereTheHandIs() {
+    var s = engagedScript()
+    s.move(.openPalm, from: [0.5, 0.5], to: [0.4, 0.5], over: 0.2)
+    s.hold(.fist, at: [0.4, 0.5], for: 0.3)
+    s.move(.fist, from: [0.4, 0.5], to: [0.6, 0.5], over: 0.4) // carry the "mouse" back
+    s.hold(.openPalm, at: [0.6, 0.5], for: 0.6)
+    let events = run(s.frames)
+    guard let rest = events.firstIndex(of: .pointerRest) else {
+        Issue.record("expected a fist to lift the pointer")
+        return
+    }
+    let after = tracks(Array(events[rest...]))
+    #expect(after.first.map { $0.x > 0.5 } == true) // lifted at 0.36: nothing tracked while the fist moved back
+    #expect(buttons(events).isEmpty)                 // a fist never clicks
+}
+
+@Test func handHeldAtEdgeGlidesThatWayFasterOverTime() {
+    var s = engagedScript()
+    s.move(.openPalm, from: [0.5, 0.5], to: [0.03, 0.5], over: 0.3)
+    s.hold(.openPalm, at: [0.03, 0.5], for: 0.5)
+    s.move(.openPalm, from: [0.03, 0.5], to: [0.5, 0.5], over: 0.3)
+    let v = glides(run(s.frames))
+    let moving = v.filter { $0 != .zero }
+    #expect(moving.count > 5)
+    #expect(moving.allSatisfy { $0.x < 0 && abs($0.y) < 1e-6 }) // left edge → pointer glides left
+    let fastest = moving.map { abs($0.x) }.max()!
+    #expect(fastest > abs(moving.first!.x) * 2)               // eases in
+    #expect(fastest <= GestureConfig.default.glideMaxSpeed + 1e-4)
+    #expect(v.last == .zero)                                  // back in the middle: stops
+}
+
+@Test func handArrivingAtEdgeDoesNotGlideUntilItVisitsTheMiddle() {
+    var s = FrameScript()
+    s.hold(.openPalm, at: [0.03, 0.5], for: 1.0) // engaged right at the edge: never seen in the middle
+    let returning = run(s.frames)
+    #expect(glides(returning).allSatisfy { $0 == .zero })
+    s.move(.openPalm, from: [0.03, 0.5], to: [0.5, 0.5], over: 0.3)
+    s.move(.openPalm, from: [0.5, 0.5], to: [0.03, 0.5], over: 0.3)
+    s.hold(.openPalm, at: [0.03, 0.5], for: 0.3)
+    #expect(glides(run(s.frames)).contains { $0.x < 0 })
+}
+
+@Test func noGlideWhileScrollingOrWithAFist() {
+    var s = engagedScript()
+    s.hold(.pinch, at: [0.5, 0.5], for: 0.1)
+    s.move(.pinch, from: [0.5, 0.5], to: [0.03, 0.5], over: 0.3) // pinch-scroll into the edge band
+    s.hold(.pinch, at: [0.03, 0.5], for: 0.4)
+    s.hold(.openPalm, at: [0.03, 0.5], for: 0.1)
+    s.move(.openPalm, from: [0.03, 0.5], to: [0.5, 0.5], over: 0.3)
+    s.hold(.fist, at: [0.5, 0.5], for: 0.3)
+    s.move(.fist, from: [0.5, 0.5], to: [0.03, 0.5], over: 0.3)
+    s.hold(.fist, at: [0.03, 0.5], for: 0.4)
+    let events = run(s.frames)
+    #expect(!scrollEvents(events).isEmpty)
+    #expect(glides(events).allSatisfy { $0 == .zero })
+}
+
+@Test func dragGlidesAtTheEdge() {
+    var s = engagedScript()
+    s.hold(.pinch, at: [0.5, 0.5], for: 0.6) // hold still → drag
+    s.move(.pinch, from: [0.5, 0.5], to: [0.03, 0.5], over: 0.3)
+    s.hold(.pinch, at: [0.03, 0.5], for: 0.4)
+    let events = run(s.frames)
+    #expect(buttons(events).contains(.button(.left, .down, anchorTime: buttons(events).first.flatMap {
+        if case .button(_, _, let a) = $0 { return a }; return nil } ?? 0)))
+    #expect(glides(events).contains { $0.x < 0 })
+}
+
+@Test func glidingKeepsEngagementAlive() {
+    var s = engagedScript()
+    s.move(.openPalm, from: [0.5, 0.5], to: [0.03, 0.5], over: 0.3)
+    s.hold(.openPalm, at: [0.03, 0.5], for: 6) // longer than the 4 s idle timeout, hand still
+    let events = run(s.frames)
+    #expect(!events.contains { if case .engagement(.standby) = $0 { return true }; return false })
+}

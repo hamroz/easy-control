@@ -95,14 +95,14 @@ if poseMode {
 }
 
 print("classifier: \(classifier.name)\(segment.map { ", segment: \($0)" } ?? "")  (replay applies no typing suppression, so counts are conservative)")
-print("recording | minutes | engagements | discrete | scrolls+dock | clicks | drags | actions/hour")
+print("recording | minutes | engagements | discrete | scrolls+dock | clicks | drags | actions/hour | glides (s)")
 var totalDuration = 0.0, totalActions = 0
 for path in args {
     let frames = try load(path, segment: segment)
     let s = ReplayBenchmark.run(frames, engine: GestureEngine(classifier: classifier), forceEngaged: forceEngaged)
     totalDuration += s.duration
     totalActions += s.discreteEvents + s.scrollsBegan + s.clicks + s.drags
-    print("\((path as NSString).lastPathComponent) | \(String(format: "%.1f", s.duration / 60)) | \(s.engagements) | \(s.discreteEvents) | \(s.scrollsBegan) | \(s.clicks) | \(s.drags) | \(String(format: "%.1f", s.actionsPerHour))")
+    print("\((path as NSString).lastPathComponent) | \(String(format: "%.1f", s.duration / 60)) | \(s.engagements) | \(s.discreteEvents) | \(s.scrollsBegan) | \(s.clicks) | \(s.drags) | \(String(format: "%.1f", s.actionsPerHour)) | \(s.glides) (\(String(format: "%.1f", s.glideSeconds)))")
 }
 let perHour = totalDuration > 0 ? Double(totalActions) / totalDuration * 3600 : 0
 print(String(format: "TOTAL %.1f min, %d actions, %.2f actions/hour (target < 1 on normal use)", totalDuration / 60, totalActions, perHour))

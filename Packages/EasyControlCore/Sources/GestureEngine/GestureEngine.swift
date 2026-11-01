@@ -34,6 +34,9 @@ public final class GestureEngine {
     private var touch: TouchRecognizer
     private var pinch: PinchDetector
     private var dock: DockSwipeRecognizer
+    private var glide: EdgeGlide
+    /// A fist lifted the pointer; it stays lifted until the hand points (open palm or index) again.
+    private var resting = false
     private var threeEvidence: [(t: Double, p: Float)] = []
     private var threeOn = false
     private var touchHand: HandID?
@@ -57,6 +60,7 @@ public final class GestureEngine {
         touch = TouchRecognizer(config: touchConfig, gesture: config)
         pinch = PinchDetector(config: touchConfig)
         dock = DockSwipeRecognizer(config: config)
+        glide = EdgeGlide(config: config)
     }
 
     /// - Parameter lastUserInput: host time of the most recent real keyboard/mouse input, if any.
@@ -126,6 +130,7 @@ public final class GestureEngine {
         var events: [GestureEvent] = []
         let settled = t >= settleUntil
         if dock.isActive || (threeOn && !touch.isBusy && settled) {
+            events += glide.stop(at: t)
             events += touch.cancel(at: t)
             if let e = dock.update(pose: threeOn ? .three : .none, palmCenter: center, aspect: aspect, at: t) { events.append(e) }
         } else {
@@ -133,15 +138,30 @@ public final class GestureEngine {
             let anchor: SIMD2<Float>? = reliable ? hand.map { HandNormalizer.isotropic($0.rawHand, .indexMCP) } : nil
             let pointer: SIMD2<Float>? = reliable ? hand.map { HandNormalizer.isotropic($0.hand, .indexMCP) } : nil
             let reading = hand.flatMap { pinch.update($0.rawHand, at: t) }
-            let presented = t - lastPresented <= config.presentedWindow || t - lastTouch <= config.touchIntentWindow
-            let touchEvents = touch.update(anchor: anchor, pointer: pointer, pinch: reading, presented: presented, at: t)
-            if touchEvents.contains(where: { if case .pointerTrack = $0 { return false }; if case .pointerLift = $0 { return false }; return true }) {
-                lastTouch = t
+            if reliable, pose == .fist, !touch.isBusy, !resting {
+                resting = true
+                events += touch.rest()
             }
-            events += touchEvents
+            if resting, pointing { resting = false }
+            if !resting {
+                let presented = t - lastPresented <= config.presentedWindow || t - lastTouch <= config.touchIntentWindow
+                let touchEvents = touch.update(anchor: anchor, pointer: pointer, pinch: reading, presented: presented, at: t)
+                if touchEvents.contains(where: Self.isTouch) { lastTouch = t }
+                events += touchEvents
+            }
+            let position: SIMD2<Float>? = reliable ? hand.map { $0.rawHand[.indexMCP].position } : nil
+            let canGlide = !resting && ((pointing && !touch.isBusy) || touch.isDragging)
+            events += glide.update(position: position, enabled: canGlide, at: t)
         }
         if events.contains(where: Self.endsContinuous) { settleUntil = t + config.continuousSettle }
         return events
+    }
+
+    private static func isTouch(_ e: GestureEvent) -> Bool {
+        switch e {
+        case .pointerTrack, .pointerLift, .pointerRest, .pointerGlide: false
+        default: true
+        }
     }
 
     private static func endsContinuous(_ e: GestureEvent) -> Bool {
@@ -169,7 +189,8 @@ public final class GestureEngine {
     }
 
     private func endGestures() -> [GestureEvent] {
-        touch.cancel(at: lastTimestamp) + [dock.cancel()].compactMap { $0 }
+        resting = false
+        return glide.reset(at: lastTimestamp) + touch.cancel(at: lastTimestamp) + [dock.cancel()].compactMap { $0 }
     }
 
     /// Gestures, clicks, and moving the pointer keep engagement alive; a still hand doesn't.
@@ -186,7 +207,8 @@ public final class GestureEngine {
             guard (d * d).sum().squareRoot() >= config.pointerActivityDistance else { return false }
             activityAnchor = position
             return true
-        case .pointerLift, .engagement: return false
+        case .pointerGlide(let velocity, _): return velocity != .zero // gliding with a still hand is use
+        case .pointerLift, .pointerRest, .engagement: return false
         }
     }
 }

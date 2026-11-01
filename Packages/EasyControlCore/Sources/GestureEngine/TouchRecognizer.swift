@@ -35,6 +35,20 @@ public struct TouchRecognizer {
         return true
     }
 
+    public var isDragging: Bool {
+        if case .dragging = state { return true }
+        return false
+    }
+
+    /// Fist: lift the pointer and leave it where it is (only from hover; a running touch keeps the hand).
+    public mutating func rest() -> [GestureEvent] {
+        guard case .hover = state else { return [] }
+        tracking = false
+        history.removeAll()
+        lostSince = nil
+        return [.pointerRest]
+    }
+
     /// - Parameters:
     ///   - anchor: the engaged hand's index knuckle from **raw** joints — touch decisions (tap vs scroll, travel)
     ///     must not see smoothing lag; nil when the hand isn't tracked this frame.

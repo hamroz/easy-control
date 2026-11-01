@@ -174,3 +174,70 @@ private func drive(_ loop: OutputLoop, samples: [SIMD2<Float>], start: Double = 
     #expect(dys.count >= 3)          // spread over frames even though the gesture already ended
     #expect(dys.max()! < 36)
 }
+
+// MARK: - Edge glide and fist lift
+
+@Test func glideMovesPointerEveryDisplayFrame() {
+    let (loop, sink) = makeLoop()
+    loop.receive([.pointerTrack(position: [0.1, 0.5], at: 10)], at: 10)
+    loop.step(at: 10)
+    var t = 10.0
+    for _ in 0..<6 { // camera frames keep confirming the glide
+        loop.receive([.pointerTrack(position: [0.1, 0.5], at: t), .pointerGlide(velocity: [-1, 0], at: t)], at: t)
+        for _ in 0..<4 { t += 1.0 / 120; loop.step(at: t) }
+    }
+    let xs = positions(sink.events).map(\.x)
+    #expect(xs.count >= 20)
+    let steps = zip(xs, xs.dropFirst()).map { $0 - $1 }
+    #expect(steps.allSatisfy { $0 > 5 && $0 < 15 }) // ≈ 1117 px/s ÷ 120 per frame, leftwards
+}
+
+@Test func glideStopsAtTheDisplayEdge() {
+    let (loop, sink) = makeLoop()
+    var t = 10.0
+    for _ in 0..<60 {
+        loop.receive([.pointerTrack(position: [0.1, 0.5], at: t), .pointerGlide(velocity: [-1.5, 0], at: t)], at: t)
+        for _ in 0..<4 { t += 1.0 / 120; loop.step(at: t) }
+    }
+    #expect(positions(sink.events).last?.x == 0)
+}
+
+@Test func glideWhileDraggingPostsDraggedEvents() {
+    let (loop, sink) = makeLoop()
+    loop.receive([.pointerTrack(position: [0.5, 0.5], at: 10)], at: 10)
+    loop.step(at: 10)
+    loop.receive([.pointerLift, .button(.left, .down, anchorTime: 10)], at: 10.01)
+    var t = 10.01
+    for _ in 0..<4 {
+        loop.receive([.pointerTrack(position: [0.5, 0.5], at: t), .pointerGlide(velocity: [0, -1], at: t)], at: t)
+        for _ in 0..<4 { t += 1.0 / 120; loop.step(at: t) }
+    }
+    let dragged = positions(sink.events, .leftDragged)
+    #expect(dragged.count >= 8)
+    #expect(dragged.last!.y < dragged.first!.y) // up
+}
+
+@Test func glideStopsWhenItIsNotRenewed() {
+    let (loop, sink) = makeLoop()
+    loop.receive([.pointerTrack(position: [0.1, 0.5], at: 10), .pointerGlide(velocity: [-1, 0], at: 10)], at: 10)
+    var t = 10.0
+    for _ in 0..<120 { t += 1.0 / 120; loop.step(at: t) } // a second with no camera frames
+    let xs = positions(sink.events).map(\.x)
+    #expect(500 - xs.last! < 1117 * 0.3) // stopped within a few frames, not a second of gliding
+    #expect(xs.count < 40)
+}
+
+@Test func restLeavesPointerPutAndDimsTheRing() {
+    let (loop, sink) = makeLoop()
+    loop.receive([.engagement(.engaged(hand: 1, mode: .command))], at: 9.9)
+    _ = drive(loop, samples: (0..<6).map { SIMD2<Float>(0.4 + 0.01 * Float($0), 0.5) })
+    loop.receive([.pointerRest], at: 11)
+    let before = sink.events.count
+    for i in 1...30 { loop.step(at: 11 + Double(i) / 120) }
+    #expect(sink.events.count == before)
+    #expect(loop.overlay.mode == .lifted)
+    loop.receive([.pointerTrack(position: [0.7, 0.5], at: 11.3)], at: 11.3) // the hand moved while lifted
+    loop.step(at: 11.31)
+    #expect(loop.overlay.mode == .hover)
+    #expect(positions(sink.events).count == positions(Array(sink.events[..<before])).count) // no jump
+}

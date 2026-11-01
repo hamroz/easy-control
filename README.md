@@ -21,13 +21,15 @@ Camera ─► Vision hand pose ─► Signal (One Euro smoothing, normalization,
 | Gesture (after engaging) | Action |
 |---|---|
 | Move your raised hand | Pointer follows, like a trackpad (slow = precise, fast = across the screen) |
+| Hold your hand near the edge of the camera view | Pointer keeps gliding that way — faster the closer to the edge — so it reaches any corner without your hand leaving the view |
+| Make a fist, move, open your hand | Lift the pointer, like picking up a mouse: it stays put while you reposition your hand |
 | **Touch thumb + index briefly** | Click (twice = double-click) |
 | Touch thumb + middle briefly | Right-click |
 | **Touch thumb + index and move** | Scroll — the page follows your hand, with momentum |
 | Touch, hold still ~0.4 s, then move | Drag (select text, move windows) |
 | Three fingers + drag left / right / up / down | Spaces strip / Mission Control / App Exposé follow your hand; release to commit or snap back |
 
-A ring around the cursor shows what EasyControl sees: hovering, pressing, scrolling or dragging.
+A ring around the cursor shows what EasyControl sees: hovering, pressing, scrolling, dragging, or lifted (dimmed).
 
 Finger-following swipes use the Dock's own swipe event (private API, resolved at runtime; see [docs/spikes/m0-results.md](docs/spikes/m0-results.md) §5 and credit to [Grabby](https://github.com/govindup63/grabby)'s research). If it is unavailable on a future macOS, three-finger drags fall back to the keyboard shortcuts on release.
 

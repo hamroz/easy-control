@@ -69,6 +69,11 @@ final class CursorOverlay {
             ring.strokeColor = accent
             ring.fillColor = nil
             ring.lineDashPattern = [4, 3]
+        case .lifted:
+            ring.path = CGPath(ellipseIn: bounds.insetBy(dx: 10, dy: 10), transform: nil)
+            ring.lineWidth = 2
+            ring.strokeColor = NSColor.white.withAlphaComponent(0.35).cgColor
+            ring.fillColor = nil
         case .hidden:
             break
         }
