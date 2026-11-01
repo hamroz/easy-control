@@ -19,14 +19,14 @@ private func positions(_ events: [SyntheticEvent], _ kind: MouseKind = .moved) -
     events.compactMap { if case let .mouse(k, x, y, _) = $0, k == kind { return CGPoint(x: x, y: y) }; return nil }
 }
 
-/// Camera samples at 30 Hz, display steps at 120 Hz in between.
-private func drive(_ loop: OutputLoop, samples: [SIMD2<Float>], start: Double = 10) -> Int {
+/// Camera samples at 30 Hz arriving `latency` after capture; display steps at 120 Hz in between.
+private func drive(_ loop: OutputLoop, samples: [SIMD2<Float>], start: Double = 10, latency: Double = 0) -> Int {
     var steps = 0
     for (i, p) in samples.enumerated() {
         let t = start + Double(i) / 30
-        loop.receive([.pointerTrack(position: p, at: t)], at: t)
+        loop.receive([.pointerTrack(position: p, at: t)], at: t, arrival: t + latency)
         for k in 0..<4 {
-            loop.step(at: t + Double(k) / 120 + 0.001)
+            loop.step(at: t + latency + Double(k) / 120 + 0.001)
             steps += 1
         }
     }
@@ -127,7 +127,50 @@ private func drive(_ loop: OutputLoop, samples: [SIMD2<Float>], start: Double = 
     let inbox = OutputInbox()
     inbox.post([.button(.left, .down, anchorTime: 10)], at: 10)
     inbox.postCancelAll(at: 10.05)
-    inbox.drain(into: loop)
+    inbox.drain(into: loop, at: 10.1)
     let kinds = sink.events.compactMap { e -> MouseKind? in if case let .mouse(k, _, _, _) = e { return k }; return nil }
     #expect(kinds == [.leftDown, .leftUp])
+}
+
+@Test func pointerSpeedIsSteadyWithRealisticLatency() {
+    let (loop, sink) = makeLoop()
+    let samples = (0..<30).map { SIMD2<Float>(0.3 + 0.01 * Float($0), 0.5) }
+    _ = drive(loop, samples: samples, latency: 0.05)
+    let moves = positions(sink.events)
+    let deltas = zip(moves, moves.dropFirst()).map { $1.x - $0.x }.dropFirst(12) // after the start-up ramp
+    let mean = deltas.reduce(0, +) / Double(deltas.count)
+    #expect(deltas.max()! / mean < 1.5) // no 30 Hz surging
+}
+
+@Test func stoppingDoesNotOvershootMuch() {
+    let (loop, sink) = makeLoop()
+    var samples = (0..<12).map { SIMD2<Float>(0.3 + 0.02 * Float($0), 0.5) } // 0.6 frame heights/s
+    samples += Array(repeating: samples.last!, count: 12)
+    _ = drive(loop, samples: samples, latency: 0.05)
+    let xs = positions(sink.events).map(\.x)
+    #expect(xs.max()! - xs.last! < 4) // little spring-back after the stop
+}
+
+@Test func clickLandsAtAnchorEvenWhenItArrivesLate() {
+    let (loop, sink) = makeLoop()
+    _ = drive(loop, samples: (0..<12).map { SIMD2<Float>(0.4 + 0.01 * Float($0), 0.5) })
+    let anchorTime = 10 + 8.0 / 30 + 0.001
+    let expected = loop.position(at: anchorTime)!
+    loop.receive([.pointerLift], at: 10 + 11.0 / 30)                     // press detected
+    for k in 0..<60 { loop.step(at: 10.4 + Double(k) / 120) }            // half a second passes (hold → drag)
+    loop.receive([.button(.left, .down, anchorTime: anchorTime)], at: 10.9)
+    #expect(positions(sink.events, .leftDown) == [expected])
+}
+
+@Test func endOfScrollGlidesInsteadOfJumping() {
+    let (loop, sink) = makeLoop()
+    loop.receive([.continuous(.scroll, phase: .began, delta: .zero), .continuous(.scroll, phase: .changed, delta: [0, 0.02]),
+                  .continuous(.scroll, phase: .ended, delta: .zero)], at: 10)
+    for k in 0..<12 { loop.step(at: 10 + Double(k) / 120) }
+    let dys = sink.events.compactMap { e -> Int32? in
+        if case let .scroll(_, dy, phase, _) = e, phase == .changed { return dy }
+        return nil
+    }
+    #expect(dys.count >= 3)          // spread over frames even though the gesture already ended
+    #expect(dys.max()! < 36)
 }

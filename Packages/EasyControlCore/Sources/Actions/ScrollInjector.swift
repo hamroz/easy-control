@@ -1,3 +1,4 @@
+import Foundation
 import GestureEngine
 
 /// Turns scroll gesture phases into trackpad-like scroll events, including momentum after a flick.
@@ -16,6 +17,8 @@ public final class ScrollInjector {
     private var carry: SIMD2<Float> = .zero
     private var momentumVelocity: SIMD2<Float>?
     private var momentumStarted = false
+    private var lastTick: Double?
+    private var momentumCarry: SIMD2<Float> = .zero
 
     public init(sink: any EventSink, pixelsPerUnit: Float = 1800, natural: Bool = true,
                 friction: Float = 0.92, minMomentumSpeed: Float = 20) {
@@ -57,23 +60,30 @@ public final class ScrollInjector {
             if (velocity * velocity).sum().squareRoot() >= minMomentumSpeed {
                 momentumVelocity = velocity
                 momentumStarted = false
+                lastTick = t
+                momentumCarry = .zero
             }
         }
     }
 
-    /// Advances momentum by one 60 Hz step.
+    /// Advances momentum to time `t` (any frame rate: friction is defined per 1/60 s).
     public func tick(at t: Double) {
         guard var v = momentumVelocity else { return }
-        v *= friction
+        let dt = Float(lastTick.map { min(max(t - $0, 0), 0.05) } ?? Double(Self.tickInterval))
+        lastTick = t
+        guard dt > 0 else { return }
+        v *= pow(friction, dt * 60)
         if (v * v).sum().squareRoot() < minMomentumSpeed {
             stopMomentum()
             return
         }
-        let step = v * Self.tickInterval
-        sink.post(.scroll(dx: Int32(step.x.rounded()), dy: Int32(step.y.rounded()), phase: .none,
-                          momentum: momentumStarted ? .continue : .began))
-        momentumStarted = true
+        let total = v * dt + momentumCarry
+        let whole = SIMD2<Float>(total.x.rounded(), total.y.rounded())
+        momentumCarry = total - whole
         momentumVelocity = v
+        guard whole != .zero || !momentumStarted else { return }
+        sink.post(.scroll(dx: Int32(whole.x), dy: Int32(whole.y), phase: .none, momentum: momentumStarted ? .continue : .began))
+        momentumStarted = true
     }
 
     /// Stops any coasting immediately (real input arrived, tracking paused).

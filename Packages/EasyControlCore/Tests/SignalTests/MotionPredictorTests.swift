@@ -10,7 +10,7 @@ import Testing
     p.update([0, 0], at: 0)
     p.update([0.1, 0], at: 1.0 / 30)
     let s = p.sample(at: 1.0 / 30 + 0.01)!
-    #expect(abs(s.x - 0.13) < 1e-3 && s.y == 0)
+    #expect(abs(s.x - 0.115) < 1e-3 && s.y == 0) // half-strength: 0.1 + 3/s × 0.01 s × 0.5
 }
 
 @Test func predictorCapsAtHorizon() {
@@ -18,7 +18,7 @@ import Testing
     p.update([0, 0], at: 0)
     p.update([0.1, 0], at: 1.0 / 30)
     let s = p.sample(at: 1.0 / 30 + 0.5)!
-    #expect(abs(s.x - (0.1 + 3 * 0.033)) < 1e-3) // velocity 3/s, at most 33 ms ahead
+    #expect(abs(s.x - (0.1 + 3 * 0.033 * 0.5)) < 1e-3) // velocity 3/s, at most 33 ms ahead, half strength
 }
 
 @Test func predictorHoldsWhenSlow() {

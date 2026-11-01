@@ -38,6 +38,13 @@ public final class OutputLoop {
     private var followed: SIMD2<Float>?
     private var pointer: CGPoint
     private var history: [(t: Double, position: CGPoint)] = []
+    /// History frozen when a press began (pointer lift): the click or drag that follows — up to a hold time plus
+    /// latency later — still finds where the pointer was at its anchor time.
+    private var pressHistory: [(t: Double, position: CGPoint)]?
+    /// When the scroll ended while motion was still pending: it glides out for `glideOut`, then ends.
+    private var scrollEndedAt: Double?
+    private var scrollEnding: Bool { scrollEndedAt != nil }
+    private static let glideOut = 0.05
     private var lastStep: Double?
     private var leftDown = false
     private var engaged = false
@@ -58,33 +65,43 @@ public final class OutputLoop {
 
     /// Something still needs display frames: pointer tracking, pending deltas, momentum, Dock re-sends, a held button.
     public var needsFrames: Bool {
-        followed != nil || !scrollSmoother.isEmpty || !dockSmoother.isEmpty || scroll.isMomentumActive
+        followed != nil || !scrollSmoother.isEmpty || !dockSmoother.isEmpty || scrollEnding || scroll.isMomentumActive
             || dock.isActive || dock.needsTicks || leftDown
     }
 
     /// Where the pointer was at time `t` (the latest frame at or before it).
     public func position(at t: Double) -> CGPoint? {
-        history.last { $0.t <= t + 1e-9 }?.position ?? history.first?.position
+        Self.lookup(t, in: history)
     }
 
-    public func receive(_ events: [GestureEvent], at t: Double) {
+    private static func lookup(_ t: Double, in frames: [(t: Double, position: CGPoint)]) -> CGPoint? {
+        frames.last { $0.t <= t + 1e-9 }?.position ?? frames.first?.position
+    }
+
+    /// - Parameter arrival: when these events reached the output loop; the pointer predictor is timed by arrival,
+    ///   so pipeline latency doesn't push every prediction to its cap.
+    public func receive(_ events: [GestureEvent], at t: Double, arrival: Double? = nil) {
         for event in events {
             switch event {
             case let .pointerTrack(raw, time):
                 if followed == nil {
                     predictor.reset()
                     deadband.reset()
+                    pressHistory = nil
                     pointer = environment.cursorLocation() // the real mouse may have moved it meanwhile
                 }
                 let position = deadband.filter(raw) // tremor doesn't move the pointer
                 if followed == nil { followed = position }
-                predictor.update(position, at: time)
+                predictor.update(position, at: arrival ?? time)
             case .pointerLift:
+                if followed != nil { pressHistory = history }
                 followed = nil
                 predictor.reset()
                 deadband.reset()
             case let .button(button, action, anchorTime):
-                press(button, action, at: position(at: anchorTime) ?? pointer)
+                let target = action == .up ? pointer : (Self.lookup(anchorTime, in: pressHistory ?? history) ?? pointer)
+                press(button, action, at: target)
+                if action != .up { pressHistory = nil }
             case let .continuous(id, phase, delta) where id == .scroll:
                 handleScroll(phase, delta: delta, at: t)
             case let .continuous(id, phase, delta) where id == .dockSwipeHorizontal || id == .dockSwipeVertical:
@@ -117,9 +134,15 @@ public final class OutputLoop {
         history.append((now, pointer))
         history.removeAll { now - $0.t > Self.historyWindow }
 
-        if scrollActive || !scrollSmoother.isEmpty {
+        if scrollActive || scrollEnding || !scrollSmoother.isEmpty {
             let d = scrollSmoother.take(dt: dt)
             if d != .zero { scroll.handle(phase: .changed, delta: SIMD2<Float>(Float(d.x), Float(d.y)), at: now) }
+            if let ended = scrollEndedAt, scrollSmoother.isEmpty || now - ended >= Self.glideOut {
+                let rest = scrollSmoother.flush() // the last few percent; a long tail would starve momentum
+                if rest != .zero { scroll.handle(phase: .changed, delta: SIMD2<Float>(Float(rest.x), Float(rest.y)), at: now) }
+                scrollEndedAt = nil
+                scroll.handle(phase: .ended, delta: .zero, at: now) // momentum starts from the glided-out motion
+            }
         }
         scroll.tick(at: now)
         if let id = dockID {
@@ -136,7 +159,7 @@ public final class OutputLoop {
             sink.post(.mouse(.leftUp, x: pointer.x, y: pointer.y, clickCount: 1))
             leftDown = false
         }
-        if scrollActive { handleScroll(.cancelled, delta: .zero, at: t) }
+        if scrollActive || scrollEnding { handleScroll(.cancelled, delta: .zero, at: t) }
         scroll.cancelMomentum()
         if let id = dockID { handleDock(id, .cancelled, delta: .zero, at: t) }
         dock.cancelActive(at: t)
@@ -175,6 +198,12 @@ public final class OutputLoop {
     private func handleScroll(_ phase: Phase, delta: SIMD2<Float>, at t: Double) {
         switch phase {
         case .began:
+            if scrollEnding { // the previous scroll is still gliding out: finish it first
+                let rest = scrollSmoother.flush()
+                if rest != .zero { scroll.handle(phase: .changed, delta: SIMD2<Float>(Float(rest.x), Float(rest.y)), at: t) }
+                scroll.handle(phase: .ended, delta: .zero, at: t)
+                scrollEndedAt = nil
+            }
             scrollSmoother.clear()
             scrollActive = true
             scroll.handle(phase: .began, delta: .zero, at: t)
@@ -182,13 +211,12 @@ public final class OutputLoop {
         case .changed:
             scrollSmoother.add(SIMD2<Double>(Double(delta.x), Double(delta.y)))
         case .ended:
-            let rest = scrollSmoother.flush()
-            if rest != .zero { scroll.handle(phase: .changed, delta: SIMD2<Float>(Float(rest.x), Float(rest.y)), at: t) }
             scrollActive = false
-            scroll.handle(phase: .ended, delta: .zero, at: t)
+            scrollEndedAt = t // keep gliding out what's pending; `step` ends the scroll
         case .cancelled:
             scrollSmoother.clear()
             scrollActive = false
+            scrollEndedAt = nil
             scroll.handle(phase: .cancelled, delta: .zero, at: t)
         }
     }
@@ -216,9 +244,9 @@ public final class OutputLoop {
 
     private func updateOverlay() {
         let mode: OverlayMode = if leftDown { .dragging }
-            else if scrollActive { .scrolling }
+            else if scrollActive || scrollEnding { .scrolling }
             else if followed != nil { .hover }
-            else if engaged && dockID == nil { .pressed }
+            else if pressHistory != nil && engaged { .pressed } // a real press, not just a lost or idle hand
             else { .hidden }
         overlay = OverlayState(mode: mode, position: pointer)
     }
@@ -249,11 +277,11 @@ public final class OutputInbox: Sendable {
         queue.withLock { $0.append(.cancelMomentum(t)) }
     }
 
-    public func drain(into loop: OutputLoop) {
+    public func drain(into loop: OutputLoop, at now: Double) {
         let items = queue.withLock { q in defer { q.removeAll() }; return q }
         for item in items {
             switch item {
-            case let .events(events, t): loop.receive(events, at: t)
+            case let .events(events, t): loop.receive(events, at: t, arrival: now)
             case let .cancelAll(t): loop.cancelAll(at: t)
             case let .cancelMomentum(t): loop.cancelMomentum(at: t)
             }

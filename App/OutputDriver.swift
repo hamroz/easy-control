@@ -40,7 +40,7 @@ final class OutputDriver: NSObject {
 
     /// Drain pending intents and render one frame now (also used synchronously at quit).
     func flush(at now: Double = CACurrentMediaTime()) {
-        inbox.drain(into: loop)
+        inbox.drain(into: loop, at: now)
         loop.step(at: now)
         overlay.show(loop.overlay)
     }

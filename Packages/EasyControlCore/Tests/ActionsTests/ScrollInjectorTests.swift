@@ -48,7 +48,7 @@ private func momentum(_ e: SyntheticEvent) -> MomentumPhase? {
     #expect(momentum(m.last!) == .ended)
     let mags = m.dropLast().map { abs(dy($0)) }
     #expect(mags.first! > 0)
-    #expect(zip(mags, mags.dropFirst()).allSatisfy { $0 >= $1 })
+    #expect(zip(mags, mags.dropFirst()).allSatisfy { $0 + 1 >= $1 }) // decays; ±1 px from sub-pixel carry
 }
 
 @Test func slowReleaseHasNoMomentum() {
@@ -76,4 +76,22 @@ private func momentum(_ e: SyntheticEvent) -> MomentumPhase? {
     #expect(momentum(tail[0]) == .ended)
     #expect(tail[1] == .scroll(dx: 0, dy: 0, phase: .began, momentum: .none))
     #expect(!s.isMomentumActive)
+}
+
+@Test func momentumIsFrameRateIndependent() {
+    func coast(hz: Double) -> (distance: Int, duration: Double) {
+        let sink = RecordingEventSink()
+        let s = ScrollInjector(sink: sink)
+        s.handle(phase: .began, delta: .zero, at: 0)
+        for i in 1...10 { s.handle(phase: .changed, delta: [0, 0.02], at: Double(i) / 60) }
+        s.handle(phase: .ended, delta: .zero, at: 11.0 / 60)
+        let before = sink.events.count
+        var t = 11.0 / 60, ticks = 0
+        while s.isMomentumActive && ticks < 1000 { ticks += 1; t += 1 / hz; s.tick(at: t) }
+        let distance = sink.events[before...].reduce(0) { sum, e in if case .scroll(_, let dy, _, _) = e { return sum + Int(dy) }; return sum }
+        return (distance, t - 11.0 / 60)
+    }
+    let at60 = coast(hz: 60), at120 = coast(hz: 120)
+    #expect(abs(Double(at60.distance - at120.distance)) / Double(at60.distance) < 0.06)
+    #expect(abs(at60.duration - at120.duration) / at60.duration < 0.1)
 }

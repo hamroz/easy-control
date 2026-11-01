@@ -5,13 +5,16 @@ public struct MotionPredictor: Sendable {
     private let horizon: Double
     private let speedFloor: Float
     private let resetGap: Double
+    /// Extrapolate only part of the velocity: a full constant-velocity guess overshoots when the hand stops.
+    private let gain: Float
     private var last: (p: SIMD2<Float>, t: Double)?
     private var velocity: SIMD2<Float> = .zero
 
-    public init(horizon: Double = 0.033, speedFloor: Float = 0.02, resetGap: Double = 0.25) {
+    public init(horizon: Double = 0.033, speedFloor: Float = 0.02, resetGap: Double = 0.25, gain: Float = 0.5) {
         self.horizon = horizon
         self.speedFloor = speedFloor
         self.resetGap = resetGap
+        self.gain = gain
     }
 
     public mutating func update(_ p: SIMD2<Float>, at t: Double) {
@@ -27,7 +30,7 @@ public struct MotionPredictor: Sendable {
         guard let last else { return nil }
         guard (velocity * velocity).sum().squareRoot() >= speedFloor else { return last.p }
         let dt = Float(min(max(t - last.t, 0), horizon))
-        return last.p + velocity * dt
+        return last.p + velocity * dt * gain
     }
 
     public mutating func reset() {
