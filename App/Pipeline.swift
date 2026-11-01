@@ -34,6 +34,8 @@ final class Pipeline: @unchecked Sendable {
     var onFrame: (@Sendable (HandFrame) -> Void)?
 
     private var dispatchEnabled = false
+    /// Whether the last batch of intents went out; when injection stops, open gestures are ended once.
+    private var dispatching = false
     private var paused = false
     private var stall = FrameStallDetector()
     private var watchdog: DispatchSourceTimer?
@@ -114,6 +116,7 @@ final class Pipeline: @unchecked Sendable {
         camera.queue.async { [self] in
             dispatchEnabled = enabled
             if enabled { monitor.start() } // also recreates the tap after a re-grant
+            else { stopDispatching() }
         }
     }
 
@@ -165,8 +168,21 @@ final class Pipeline: @unchecked Sendable {
     }
 
     private func post(_ events: [GestureEvent], at t: Double) {
-        guard canDispatch else { return }
+        guard canDispatch else {
+            stopDispatching()
+            return
+        }
+        dispatching = true
         inbox.post(events, at: t)
+    }
+
+    /// Accessibility revoked or the typing guard lost: end any scroll, drag or Dock swipe the output loop still
+    /// holds (whatever can still be posted goes out; if nothing can, the next grant starts clean).
+    private func stopDispatching() {
+        guard dispatching else { return }
+        dispatching = false
+        inbox.postCancelAll(at: CACurrentMediaTime())
+        notifyOutput()
     }
 
     private func notifyOutput() {
