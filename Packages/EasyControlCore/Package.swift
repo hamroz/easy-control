@@ -22,7 +22,7 @@ let package = Package(
         .target(name: "TestSupport", dependencies: ["HandTracking"]),
         .executableTarget(name: "ec-probe", dependencies: ["Actions"]),
         .executableTarget(name: "ec-extract", dependencies: ["Capture", "Signal"]),
-        .executableTarget(name: "ec-replay", dependencies: ["GestureEngine"]),
+        .executableTarget(name: "ec-replay", dependencies: ["GestureEngine", "Signal"]),
         .testTarget(name: "HandTrackingTests", dependencies: ["HandTracking", "TestSupport"]),
         .testTarget(name: "SignalTests", dependencies: ["Signal", "TestSupport"]),
         .testTarget(name: "GestureEngineTests", dependencies: ["GestureEngine", "TestSupport"]),

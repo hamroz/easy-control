@@ -35,7 +35,9 @@ public struct PinchDetector {
             guard let last, t - last.t <= config.confidenceHold else { return nil }
             return last.reading
         }
-        index = index ? indexRatio <= config.openRatio : indexRatio < config.closeRatio
+        let reach = HandNormalizer.isotropic(hand, .indexTip) - HandNormalizer.isotropic(hand, .wrist)
+        let extended = (reach * reach).sum().squareRoot() / size >= config.minIndexReach
+        index = index ? indexRatio <= config.openRatio : indexRatio < config.closeRatio && extended
         if let middleRatio = ratio(.middleTip) {
             middle = middle ? middleRatio <= config.openRatio : middleRatio < config.closeRatio
         }

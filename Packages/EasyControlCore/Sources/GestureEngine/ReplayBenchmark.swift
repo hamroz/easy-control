@@ -5,7 +5,10 @@ public struct ReplayStats: Sendable, Equatable {
     public var engagements: Int
     public var discreteEvents: Int
     public var scrollsBegan: Int
-    /// (discrete events + scrolls begun) per hour. On a normal-use recording every action is a false one.
+    public var clicks: Int = 0
+    public var drags: Int = 0
+    /// (discrete events + scrolls/Dock drags begun + clicks + drags) per hour. On a normal-use recording every
+    /// action is a false one.
     public var actionsPerHour: Double
 }
 
@@ -19,12 +22,14 @@ public enum ReplayBenchmark {
                 case .engagement(.engaged): stats.engagements += 1
                 case .discrete: stats.discreteEvents += 1
                 case .continuous(_, .began, _): stats.scrollsBegan += 1
+                case .button(_, .click, _): stats.clicks += 1
+                case .button(_, .down, _): stats.drags += 1
                 default: break
                 }
             }
         }
         if let first = frames.first, let last = frames.last { stats.duration = last.timestamp - first.timestamp }
-        let actions = Double(stats.discreteEvents + stats.scrollsBegan)
+        let actions = Double(stats.discreteEvents + stats.scrollsBegan + stats.clicks + stats.drags)
         stats.actionsPerHour = stats.duration > 0 ? actions / stats.duration * 3600 : 0
         return stats
     }

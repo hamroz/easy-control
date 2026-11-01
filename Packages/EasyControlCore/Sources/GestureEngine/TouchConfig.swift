@@ -3,6 +3,9 @@
 public struct TouchConfig: Sendable {
     public var closeRatio: Float = 0.22
     public var openRatio: Float = 0.35
+    /// A pinch needs the index tip at least this far from the wrist (palm sizes): a fist's curled index with the
+    /// thumb resting on it also "touches" (calibrated on the user's recordings: fist p50 0.70, pinch p5 0.93).
+    public var minIndexReach: Float = 0.85
     public var tipConfidence: Float = 0.3
     public var confidenceHold: Double = 0.2
     public var tapMax: Double = 0.25

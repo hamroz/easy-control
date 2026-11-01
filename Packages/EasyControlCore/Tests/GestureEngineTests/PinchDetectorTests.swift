@@ -35,3 +35,13 @@ private func reading(_ d: inout PinchDetector, _ hand: Hand, at t: Double) -> Pi
     let rb = reading(&b, SyntheticHand.make(.pinch, palmSize: 0.2, pinchOpenness: 0.6), at: 0)!.ratio
     #expect(abs(ra - rb) < 1e-3)
 }
+
+@Test func fistWithThumbOnIndexIsNotPinch() {
+    // A curled index (tip pulled into the palm) with the thumb resting on it: touching, but not a pinch.
+    var fist = SyntheticHand.make(.fist)
+    let s: Float = 0.12, center = SIMD2<Float>(0.5, 0.5)
+    fist[.indexTip].position = center + [-0.2 * s, 0.45 * s]
+    fist[.thumbTip].position = fist[.indexTip].position + [0.01 * s, 0]
+    var d = PinchDetector(config: .default)
+    #expect(d.update(fist, at: 0)?.index == false)
+}

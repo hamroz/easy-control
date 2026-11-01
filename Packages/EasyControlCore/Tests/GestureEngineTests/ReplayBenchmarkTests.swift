@@ -36,3 +36,17 @@ import TestSupport
     #expect(histogram[.fist, default: 0] >= 27) // 30 frames minus the stabilizer's 2-frame warm-up
     #expect(histogram.values.reduce(0, +) == 30) // only frames with a hand count
 }
+
+@Test func statsCountClicksAndDrags() {
+    var s = FrameScript()
+    s.hold(.openPalm, at: [0.5, 0.5], for: 0.5)
+    s.hold(.pinch, at: [0.5, 0.5], for: 0.13)                   // tap
+    s.hold(.openPalm, at: [0.5, 0.5], for: 0.5)
+    s.hold(.pinch, at: [0.5, 0.5], for: 0.6)                    // hold → drag
+    s.move(.pinch, from: [0.5, 0.5], to: [0.6, 0.5], over: 0.2)
+    s.hold(.openPalm, at: [0.6, 0.5], for: 0.3)
+    let stats = ReplayBenchmark.run(s.frames, engine: GestureEngine())
+    #expect(stats.clicks == 1)
+    #expect(stats.drags == 1)
+    #expect(abs(stats.actionsPerHour - 2 / stats.duration * 3600) < 1e-6)
+}

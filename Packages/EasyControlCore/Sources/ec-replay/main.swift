@@ -5,6 +5,7 @@
 import Foundation
 import GestureEngine
 import HandTracking
+import Signal
 
 var args = Array(CommandLine.arguments.dropFirst())
 var classifier: any PoseClassifying = RuleBasedPoseClassifier()
@@ -13,6 +14,37 @@ if let i = args.firstIndex(of: "--model"), args.indices.contains(i + 1) {
     classifier = try CoreMLPoseClassifier(compiledModelURL: compiled)
     args.removeSubrange(i...(i + 1))
 }
+// --pinch-stats: distribution of the thumb–index ratio per recording (aggregates only), for calibration.
+if args.contains("--pinch-stats") {
+    args.removeAll { $0 == "--pinch-stats" }
+    print("recording | frames | ratio p5 | p50 | p95 | share < close(\(TouchConfig.default.closeRatio)) | share < open(\(TouchConfig.default.openRatio)) | index reach of closed frames p5/p50/p95")
+    for path in args {
+        let frames = try HandFrameRecording.decode(Data(contentsOf: URL(fileURLWithPath: path)))
+        let kept = zip(frames, RecordingSplitter.assign(timestamps: frames.map(\.timestamp))).filter { $0.1 != nil }.map(\.0)
+        var ratios: [Float] = []
+        var reach: [Float] = [] // |index tip − wrist| / palm size, for frames that read as pinched
+        for frame in kept {
+            guard let hand = frame.hands.max(by: { HandNormalizer.palmSize($0) < HandNormalizer.palmSize($1) }),
+                  hand[.thumbTip].confidence >= 0.3, hand[.indexTip].confidence >= 0.3 else { continue }
+            let d = HandNormalizer.isotropic(hand, .thumbTip) - HandNormalizer.isotropic(hand, .indexTip)
+            let r = (d * d).sum().squareRoot() / max(HandNormalizer.palmSize(hand), 1e-6)
+            ratios.append(r)
+            if r < TouchConfig.default.closeRatio {
+                let e = HandNormalizer.isotropic(hand, .indexTip) - HandNormalizer.isotropic(hand, .wrist)
+                reach.append((e * e).sum().squareRoot() / max(HandNormalizer.palmSize(hand), 1e-6))
+            }
+        }
+        guard !ratios.isEmpty else { continue }
+        let sorted = ratios.sorted()
+        func q(_ p: Double) -> Float { sorted[min(sorted.count - 1, Int(Double(sorted.count) * p))] }
+        let below = { (x: Float) in Double(ratios.filter { $0 < x }.count) / Double(ratios.count) * 100 }
+        let rs = reach.sorted()
+        func rq(_ p: Double) -> Float { rs.isEmpty ? .nan : rs[min(rs.count - 1, Int(Double(rs.count) * p))] }
+        print("\((path as NSString).lastPathComponent) | \(ratios.count) | \(String(format: "%.3f | %.3f | %.3f | %.1f%% | %.1f%% | %.2f / %.2f / %.2f", q(0.05), q(0.5), q(0.95), below(TouchConfig.default.closeRatio), below(TouchConfig.default.openRatio), rq(0.05), rq(0.5), rq(0.95)))")
+    }
+    exit(0)
+}
+
 let poseMode = args.contains("--poses")
 args.removeAll { $0 == "--poses" }
 // --segment test: replay only the held-out part of each recording (the part never used for training).
@@ -59,14 +91,14 @@ if poseMode {
 }
 
 print("classifier: \(classifier.name)\(segment.map { ", segment: \($0)" } ?? "")  (replay applies no typing suppression, so counts are conservative)")
-print("recording | minutes | engagements | swipes | scrolls | actions/hour")
+print("recording | minutes | engagements | discrete | scrolls+dock | clicks | drags | actions/hour")
 var totalDuration = 0.0, totalActions = 0
 for path in args {
     let frames = try load(path, segment: segment)
     let s = ReplayBenchmark.run(frames, engine: GestureEngine(classifier: classifier))
     totalDuration += s.duration
-    totalActions += s.discreteEvents + s.scrollsBegan
-    print("\((path as NSString).lastPathComponent) | \(String(format: "%.1f", s.duration / 60)) | \(s.engagements) | \(s.discreteEvents) | \(s.scrollsBegan) | \(String(format: "%.1f", s.actionsPerHour))")
+    totalActions += s.discreteEvents + s.scrollsBegan + s.clicks + s.drags
+    print("\((path as NSString).lastPathComponent) | \(String(format: "%.1f", s.duration / 60)) | \(s.engagements) | \(s.discreteEvents) | \(s.scrollsBegan) | \(s.clicks) | \(s.drags) | \(String(format: "%.1f", s.actionsPerHour))")
 }
 let perHour = totalDuration > 0 ? Double(totalActions) / totalDuration * 3600 : 0
 print(String(format: "TOTAL %.1f min, %d actions, %.2f actions/hour (target < 1 on normal use)", totalDuration / 60, totalActions, perHour))
