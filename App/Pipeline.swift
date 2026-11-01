@@ -16,14 +16,17 @@ struct PipelineSnapshot: Sendable {
     var latestFrame: HandFrame?
 }
 
-/// Camera → Vision → gesture engine → actions, all on the capture queue.
-/// Every mutable property below is only touched on `camera.queue`.
+/// Camera → Vision → gesture engine on the capture queue; intents go to the output loop through `inbox`
+/// (rendered at display rate by `OutputDriver`). Every mutable property below is only touched on `camera.queue`.
 final class Pipeline: @unchecked Sendable {
     let camera = CameraCapture()
+    let inbox = OutputInbox()
     private let detector = VisionHandDetector()
     private let engine = GestureEngine(classifier: Pipeline.loadClassifier())
-    private let dispatcher: ActionDispatcher
     private let monitor = InputActivityMonitor()
+
+    /// Set before `start()`; called on the capture queue whenever the output loop has work (argument: engaged).
+    var onOutput: (@Sendable (Bool) -> Void)?
 
     /// Set before `start()`; called on the capture queue at most 10 times per second.
     var onSnapshot: (@Sendable (PipelineSnapshot) -> Void)?
@@ -40,7 +43,6 @@ final class Pipeline: @unchecked Sendable {
     private var frameTimes: [Double] = []
     private var lastHandSeen: Double = 0
     private var lowPower = false
-    private var momentumTimer: DispatchSourceTimer?
     private var lastPublish: Double = 0
     private var captureState: CaptureState = .stopped
     private var latestFrame: HandFrame?
@@ -50,8 +52,6 @@ final class Pipeline: @unchecked Sendable {
     private static let idleAfter = 5.0
 
     init() {
-        let sink = CGEventSink()
-        dispatcher = ActionDispatcher(sink: sink, spaces: ControlArrowStrategy(sink: sink), scroll: ScrollInjector(sink: sink))
         camera.onFrame = { [weak self] buffer, pts in self?.process(buffer, pts) }
         camera.onStateChange = { [weak self] state in
             guard let self else { return }
@@ -85,11 +85,11 @@ final class Pipeline: @unchecked Sendable {
     func setPaused(_ paused: Bool) {
         camera.queue.async { [self] in
             self.paused = paused
-            let events = engine.setPaused(paused, at: CACurrentMediaTime())
-            if dispatchEnabled { dispatcher.handle(events, at: CACurrentMediaTime()) }
+            let now = CACurrentMediaTime()
+            post(engine.setPaused(paused, at: now), at: now)
             if paused {
-                dispatcher.cancelMomentum()
-                updateMomentumTimer() // keep ticking so the Dock's end re-sends go out while paused
+                inbox.postCancelAll(at: now) // the output loop keeps running until the Dock's end re-sends are out
+                notifyOutput()
                 stall = FrameStallDetector()
                 camera.stop()
             } else {
@@ -99,13 +99,13 @@ final class Pipeline: @unchecked Sendable {
         }
     }
 
-    /// Ends any open scroll or Dock swipe before the app quits, so nothing is left mid-transition.
+    /// Queues the end of any open scroll, drag or Dock swipe before the app quits; the caller flushes the
+    /// output loop synchronously afterwards.
     func prepareToQuit() {
         camera.queue.sync {
             let now = CACurrentMediaTime()
-            let events = engine.setPaused(true, at: now)
-            if dispatchEnabled { dispatcher.handle(events, at: now) }
-            dispatcher.cancelMomentum()
+            post(engine.setPaused(true, at: now), at: now)
+            inbox.postCancelAll(at: now)
         }
     }
 
@@ -133,9 +133,8 @@ final class Pipeline: @unchecked Sendable {
         onFrame?(frame)
 
         stopMomentumOnUserInput()
-        let events = engine.process(frame, lastUserInput: monitor.lastUserInput)
-        if canDispatch { dispatcher.handle(events, at: t) }
-        updateMomentumTimer()
+        post(engine.process(frame, lastUserInput: monitor.lastUserInput), at: t)
+        notifyOutput()
 
         let done = CACurrentMediaTime()
         latency.add((done - t) * 1000)
@@ -162,7 +161,16 @@ final class Pipeline: @unchecked Sendable {
     private func stopMomentumOnUserInput() {
         guard let input = monitor.lastUserInput, input != handledUserInput else { return }
         handledUserInput = input
-        dispatcher.cancelMomentum()
+        inbox.postCancelMomentum(at: CACurrentMediaTime())
+    }
+
+    private func post(_ events: [GestureEvent], at t: Double) {
+        guard canDispatch else { return }
+        inbox.post(events, at: t)
+    }
+
+    private func notifyOutput() {
+        if case .engaged = engine.snapshot.state { onOutput?(true) } else { onOutput?(false) }
     }
 
     /// If frames stop arriving without a pause (camera interrupted, disconnected, permission revoked),
@@ -175,34 +183,13 @@ final class Pipeline: @unchecked Sendable {
             guard let self, !paused else { return }
             let now = CACurrentMediaTime()
             guard stall.isStalled(at: now) else { return }
-            let events = engine.process(HandFrame(timestamp: now, hands: []), lastUserInput: monitor.lastUserInput)
-            if canDispatch { dispatcher.handle(events, at: now) }
-            dispatcher.cancelMomentum()
-            updateMomentumTimer()
+            post(engine.process(HandFrame(timestamp: now, hands: []), lastUserInput: monitor.lastUserInput), at: now)
+            inbox.postCancelMomentum(at: now)
+            notifyOutput()
             publish(force: true)
         }
         timer.resume()
         watchdog = timer
-    }
-
-    private func stopMomentumTimer() {
-        momentumTimer?.cancel()
-        momentumTimer = nil
-    }
-
-    private func updateMomentumTimer() {
-        if dispatcher.needsTicks, momentumTimer == nil {
-            let timer = DispatchSource.makeTimerSource(queue: camera.queue)
-            timer.schedule(deadline: .now(), repeating: 1.0 / 60)
-            timer.setEventHandler { [weak self] in
-                guard let self else { return }
-                stopMomentumOnUserInput()
-                dispatcher.tick(at: CACurrentMediaTime())
-                if !dispatcher.needsTicks { stopMomentumTimer() }
-            }
-            timer.resume()
-            momentumTimer = timer
-        }
     }
 
     private func publish(force: Bool) {

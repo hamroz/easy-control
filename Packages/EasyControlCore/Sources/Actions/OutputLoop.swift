@@ -9,8 +9,13 @@ public enum OverlayMode: Sendable, Equatable {
 }
 
 public struct OverlayState: Sendable, Equatable {
-    public var mode: OverlayMode = .hidden
-    public var position: CGPoint = .zero
+    public var mode: OverlayMode
+    public var position: CGPoint
+
+    public init(mode: OverlayMode = .hidden, position: CGPoint = .zero) {
+        self.mode = mode
+        self.position = position
+    }
 }
 
 /// Renders gesture intents at display rate (spec §3): the pointer follows a predicted, smoothed hand position;
@@ -219,19 +224,39 @@ public final class OutputLoop {
     }
 }
 
-/// Hands gesture intents from the capture queue to the output thread.
+/// Hands gesture intents and control commands from other threads to the output thread, in order.
 public final class OutputInbox: Sendable {
-    private let queue = Mutex<[(events: [GestureEvent], t: Double)]>([])
+    private enum Item {
+        case events([GestureEvent], Double)
+        case cancelAll(Double)
+        case cancelMomentum(Double)
+    }
+
+    private let queue = Mutex<[Item]>([])
 
     public init() {}
 
     public func post(_ events: [GestureEvent], at t: Double) {
         guard !events.isEmpty else { return }
-        queue.withLock { $0.append((events, t)) }
+        queue.withLock { $0.append(.events(events, t)) }
+    }
+
+    public func postCancelAll(at t: Double) {
+        queue.withLock { $0.append(.cancelAll(t)) }
+    }
+
+    public func postCancelMomentum(at t: Double) {
+        queue.withLock { $0.append(.cancelMomentum(t)) }
     }
 
     public func drain(into loop: OutputLoop) {
-        let batches = queue.withLock { q in defer { q.removeAll() }; return q }
-        for batch in batches { loop.receive(batch.events, at: batch.t) }
+        let items = queue.withLock { q in defer { q.removeAll() }; return q }
+        for item in items {
+            switch item {
+            case let .events(events, t): loop.receive(events, at: t)
+            case let .cancelAll(t): loop.cancelAll(at: t)
+            case let .cancelMomentum(t): loop.cancelMomentum(at: t)
+            }
+        }
     }
 }

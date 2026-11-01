@@ -15,6 +15,7 @@ final class AppModel {
     private(set) var startError: String?
 
     let pipeline = Pipeline()
+    @ObservationIgnored private var output: OutputDriver?
     let recorder = LandmarkRecorder()
     private(set) var isRecording = false
     private(set) var lastRecording: URL?
@@ -28,12 +29,22 @@ final class AppModel {
             Task { @MainActor in self?.snapshot = snapshot }
         }
         pipeline.onFrame = { [recorder] frame in recorder.append(frame) }
+        let output = OutputDriver(inbox: pipeline.inbox)
+        self.output = output
+        pipeline.onOutput = { [weak output] engaged in
+            Task { @MainActor in
+                output?.engaged = engaged
+                output?.wake()
+            }
+        }
         autoPause = AutoPause { [weak self] paused in
             self?.autoPaused = paused
             self?.applyPause()
         }
         NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) {
-            [pipeline] _ in pipeline.prepareToQuit()
+            [pipeline, output] _ in
+            pipeline.prepareToQuit()
+            MainActor.assumeIsolated { output.flush() } // posts the mouse-up / scroll end before we exit
         }
         permissionTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshPermissions() }

@@ -121,3 +121,13 @@ private func drive(_ loop: OutputLoop, samples: [SIMD2<Float>], start: Double = 
     loop.step(at: 10.2)
     #expect(!loop.needsFrames)
 }
+
+@Test func inboxDeliversEventsThenControlInOrder() {
+    let (loop, sink) = makeLoop()
+    let inbox = OutputInbox()
+    inbox.post([.button(.left, .down, anchorTime: 10)], at: 10)
+    inbox.postCancelAll(at: 10.05)
+    inbox.drain(into: loop)
+    let kinds = sink.events.compactMap { e -> MouseKind? in if case let .mouse(k, _, _, _) = e { return k }; return nil }
+    #expect(kinds == [.leftDown, .leftUp])
+}
