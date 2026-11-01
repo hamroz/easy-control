@@ -30,6 +30,15 @@ DEFAULT = {"gate": "reliable", "weight_power": 0.0, "hidden": [256, 128]}
 GRID = {"gate": ["known", "reliable"], "weight_power": [0.0, 0.5], "hidden": [[128, 64], [256, 128]]}
 
 
+def output_paths(include_local: bool) -> tuple[pathlib.Path, bool]:
+    """Where the model goes, and whether this run produces the shipped artifacts (model in the app bundle,
+    report, metrics, fixture). A model trained on the user's own recordings is personal data: it stays in the
+    git-ignored data/ folder and never replaces the public model."""
+    if include_local:
+        return ROOT / "data/local/PoseClassifier.mlpackage", False
+    return ROOT / "App/Resources/PoseClassifier.mlpackage", True
+
+
 def seed() -> None:
     torch.manual_seed(42)
     np.random.seed(42)
@@ -142,12 +151,17 @@ def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--features", default=str(ROOT / "data/hagrid/features.jsonl"))
     p.add_argument("--local", default=str(ROOT / "data/local/features.jsonl"),
-                   help="the user's own recordings (ec-extract --recordings); used if present")
+                   help="the user's own recordings (ec-extract --recordings)")
+    p.add_argument("--include-local", action="store_true",
+                   help="personalize with --local; the model is written to data/local/ (never into the repo)")
     p.add_argument("--sweep", action="store_true", help="select the configuration on the validation split first")
     p.add_argument("--sweep-local", action="store_true",
                    help="choose how much the user's recordings count, on their validation slice")
     args = p.parse_args()
-    paths = [pathlib.Path(args.features), pathlib.Path(args.local)]
+    paths = [pathlib.Path(args.features)] + ([pathlib.Path(args.local)] if args.include_local else [])
+    model_path, shipped = output_paths(args.include_local)
+    if args.sweep_local and not args.include_local:
+        p.error("--sweep-local needs --include-local")
 
     cfg, sweep = dict(DEFAULT), []
     if args.sweep:
@@ -199,7 +213,8 @@ def main() -> None:
     result = evaluate(model, test)
     local_result = evaluate(model, local_test) if len(local_test.y) else None
 
-    mlmodel = export_coreml(model, ROOT / "App/Resources/PoseClassifier.mlpackage", CLASSES, gate=cfg["gate"])
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+    mlmodel = export_coreml(model, model_path, CLASSES, gate=cfg["gate"])
     Xg = test.X[test.gated]
     n = min(300, len(Xg))
     torch_pred = probabilities(model, Xg[:n]).argmax(1)
@@ -222,10 +237,14 @@ def main() -> None:
         "rules": evaluate_rules(test),
         "coreml_check": {"n": n, "agreement": float(np.mean(np.array(coreml_pred) == torch_pred))},
     }
-    (ROOT / "docs/eval/m3-metrics.json").write_text(json.dumps(metrics, indent=2) + "\n")
-    (ROOT / "docs/eval/m3-report.md").write_text(render(metrics))
+    if shipped:
+        (ROOT / "docs/eval/m3-metrics.json").write_text(json.dumps(metrics, indent=2) + "\n")
+        (ROOT / "docs/eval/m3-report.md").write_text(render(metrics))
+    else:
+        (model_path.parent / "metrics.json").write_text(json.dumps(metrics, indent=2) + "\n")
 
-    fixture = ROOT / "Packages/EasyControlCore/Tests/GestureEngineTests/Fixtures/pose-fixture.jsonl"
+    fixture = (ROOT / "Packages/EasyControlCore/Tests/GestureEngineTests/Fixtures/pose-fixture.jsonl" if shipped
+               else model_path.parent / "pose-fixture.jsonl")
     rng = np.random.default_rng(42)
     rows = []
     for c in range(len(CLASSES)):
@@ -234,6 +253,7 @@ def main() -> None:
             rows.append(json.dumps({"label": CLASSES[c], "vector": [round(float(v), 6) for v in Xg[i]]}))
     fixture.write_text("\n".join(rows) + "\n")
 
+    print(f"model → {model_path.relative_to(ROOT)}")
     print(f"config {cfg}  test: acted {result['acted_accuracy']:.4f}  end-to-end {result['end_to_end_accuracy']:.4f}  "
           f"gated {result['gated_accuracy']:.4f}  precision {result['acted_gesture_precision']:.4f}  "
           f"none→gesture {result['none_false_trigger_rate']:.4f}  coreml agreement {metrics['coreml_check']['agreement']:.3f}")

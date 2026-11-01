@@ -80,7 +80,7 @@ swift run -c release --package-path ../../Packages/EasyControlCore ec-extract --
 cd ../training && uv run train.py
 # with your own recordings:
 swift run -c release --package-path ../../Packages/EasyControlCore ec-extract --recordings ~/Library/Application\ Support/EasyControl/recordings --out ../../data/local/features.jsonl
-uv run train.py --sweep-local
+uv run train.py --include-local --sweep-local   # personal model → data/local/ (never committed)
 ```
 
 | Path | What |

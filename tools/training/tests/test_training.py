@@ -99,3 +99,12 @@ def test_local_weight_repeats_local_rows():
     meta = [{"user_id": "u1"}, {"user_id": "local-user"}, {"user_id": "u2"}]
     Xw, yw = weighted(X, y, meta, local_weight=3)
     assert list(yw).count(1) == 3 and list(yw).count(0) == 1 and len(Xw) == 5
+
+
+def test_personal_model_never_written_into_app_resources():
+    from train import ROOT, output_paths
+    model, shipped = output_paths(include_local=True)
+    assert "App/Resources" not in str(model) and str(model).startswith(str(ROOT / "data"))
+    assert shipped is False  # report, metrics and fixture describe the shipped model only
+    model, shipped = output_paths(include_local=False)
+    assert model == ROOT / "App/Resources/PoseClassifier.mlpackage" and shipped is True

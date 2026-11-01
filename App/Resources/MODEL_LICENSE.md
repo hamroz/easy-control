@@ -10,10 +10,8 @@ gesture labels were remapped into EasyControl's classes (several merged into `no
 Apple Vision and converted into 55-value feature vectors (with chirality-flipped copies for training); a new
 classifier was trained on those vectors. No images are redistributed.
 
-**Personal data:** the bundled model was additionally trained on hand-landmark recordings of the project's author
-(recorded by the author for training; this is also the only source of the `pinch` class), so it is biased toward
-that person's hand. No images or video are included — only 21-point hand landmarks were used. For distribution, a
-HaGRID-only base model with on-device personalization is the intended path.
+The bundled model is trained on HaGRID only. Personalization with a user's own recordings happens locally
+(`train.py --include-local` writes to the git-ignored `data/local/`); personal models are never committed or shipped.
 
 The model is licensed under **CC BY-SA 4.0** (https://creativecommons.org/licenses/by-sa/4.0/). It is provided
 "as is", without warranties. The EasyControl source code is licensed separately.
