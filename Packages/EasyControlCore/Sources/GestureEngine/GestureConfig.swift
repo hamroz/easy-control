@@ -3,8 +3,8 @@ public struct GestureConfig: Sendable {
     public var poseEnter: Float = 0.85
     public var poseExit: Float = 0.60
     public var poseEnterFrames = 3
-    public var wakeHold: Double = 0.4
-    /// Two or three fingers held this long engage directly from idle.
+    public var wakeHold: Double = 0.3
+    /// Three fingers held this long engage directly from idle.
     public var directEngageHold: Double = 0.3
     /// After engagement ends (hand left or went idle), any move into a gesture pose resumes it instantly.
     public var standbyDuration: Double = 15
@@ -12,7 +12,7 @@ public struct GestureConfig: Sendable {
     public var resumeHold: Double = 0.15
     /// …by a hand that changed pose: to another gesture, or relaxed for at least this long.
     public var resumeRelax: Double = 0.2
-    public var idleTimeout: Double = 3.0
+    public var idleTimeout: Double = 8.0
     public var handLostTimeout: Double = 1.0
     public var inputSuppression: Double = 0.5
     public var discreteCooldown: Double = 0.4
@@ -39,6 +39,13 @@ public struct GestureConfig: Sendable {
     public var continuousReleaseFrames = 3
     /// After a scroll or drag ends, no other gesture may start for this long (exclusive lock + settle).
     public var continuousSettle: Double = 0.2
+    /// Three fingers count when their mean probability over `threeWindow` rises above `threeEnter`
+    /// (and stop below `threeExit`): steadier than requiring consecutive confident frames.
+    public var threeWindow: Double = 0.15
+    public var threeEnter: Float = 0.7
+    public var threeExit: Float = 0.5
+    /// Pointer movement (frame heights) that counts as activity, keeping engagement alive.
+    public var pointerActivityDistance: Float = 0.02
 
     public init() {}
 

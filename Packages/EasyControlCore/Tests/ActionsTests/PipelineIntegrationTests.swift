@@ -27,12 +27,12 @@ private struct Rig {
     }
 }
 
-/// Engage, then a fast two-finger flick that is still moving at the end of the script.
+/// Engage, then a fast pinch flick that is still moving at the end of the script.
 private func flickScript() -> FrameScript {
     var s = FrameScript()
     s.hold(.openPalm, at: [0.5, 0.4], for: 0.6)
-    s.hold(.two, at: [0.5, 0.4], for: 0.2)
-    s.move(.two, from: [0.5, 0.4], to: [0.5, 0.7], over: 0.3)
+    s.hold(.pinch, at: [0.5, 0.4], for: 0.1)
+    s.move(.pinch, from: [0.5, 0.4], to: [0.5, 0.7], over: 0.3)
     return s
 }
 
@@ -49,7 +49,7 @@ private func flickScript() -> FrameScript {
     let rig = Rig()
     var s = flickScript()
     let typedAt = s.now
-    s.move(.two, from: [0.5, 0.7], to: [0.5, 0.75], over: 0.1)
+    s.move(.pinch, from: [0.5, 0.7], to: [0.5, 0.75], over: 0.1)
     rig.play(s.frames) { $0.timestamp >= typedAt ? typedAt : nil }
     rig.tick(from: s.now)
     #expect(rig.momentumEvents.isEmpty)

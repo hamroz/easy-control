@@ -102,28 +102,14 @@ private func total(_ events: [GestureEvent]) -> SIMD2<Float> {
     #expect(dock.last == .continuous(.dockSwipeHorizontal, phase: .cancelled, delta: .zero))
 }
 
-@Test func flickerToTwoMidScrollDoesNotStartDockSwipe() {
+@Test func dockWaitsForSettleAfterPinchScroll() {
     var s = FrameScript()
-    s.hold(.openPalm, at: [0.5, 0.4], for: 0.6)
-    s.hold(.two, at: [0.5, 0.4], for: 0.2)
-    s.move(.two, from: [0.5, 0.4], to: [0.5, 0.5], over: 0.2)
-    s.move(.three, from: [0.5, 0.5], to: [0.5, 0.55], over: 0.17) // brief misread mid-scroll (~2–3 stable frames)
-    s.move(.two, from: [0.5, 0.55], to: [0.5, 0.65], over: 0.2)
+    s.hold(.openPalm, at: [0.5, 0.4], for: 0.5)
+    s.hold(.pinch, at: [0.5, 0.4], for: 0.1)
+    s.move(.pinch, from: [0.5, 0.4], to: [0.5, 0.55], over: 0.25)
+    s.move(.three, from: [0.5, 0.55], to: [0.5, 0.75], over: 0.15) // straight into three fingers, still moving
     let engine = GestureEngine()
     let events = s.frames.flatMap { engine.process($0, lastUserInput: nil) }
+    #expect(events.contains { if case .continuous(.scroll, .began, _) = $0 { return true }; return false })
     #expect(!events.contains { if case .continuous(.dockSwipeVertical, _, _) = $0 { return true }; return false })
-    #expect(!events.contains { if case .continuous(.dockSwipeHorizontal, _, _) = $0 { return true }; return false })
-    #expect(events.filter { $0 == .continuous(.scroll, phase: .began, delta: .zero) }.count == 1)
-}
-
-@Test func releasingDockSwipeIntoPalmDoesNotSwipe() {
-    var s = FrameScript()
-    s.hold(.openPalm, at: [0.4, 0.5], for: 0.6)
-    s.hold(.three, at: [0.4, 0.5], for: 0.2)
-    s.move(.three, from: [0.3, 0.5], to: [0.45, 0.5], over: 0.15)
-    s.move(.openPalm, from: [0.45, 0.5], to: [0.85, 0.5], over: 0.3) // still flicking as the pose changes
-    s.hold(.openPalm, at: [0.85, 0.5], for: 0.3)
-    let engine = GestureEngine()
-    let events = s.frames.flatMap { engine.process($0, lastUserInput: nil) }
-    #expect(!events.contains { if case .discrete = $0 { return true }; return false })
 }

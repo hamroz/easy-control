@@ -108,7 +108,9 @@ struct DebugView: View {
         switch event {
         case .discrete(let id): id.rawValue
         case .continuous(let id, let phase, _): "\(id.rawValue) \(phase.rawValue)"
-        case .cursor: "cursor"
+        case .pointerTrack: "pointer"
+        case .pointerLift: "pointer lifted"
+        case .button(let button, let action, _): "\(button) \(action)"
         case .engagement(let state): describe(state)
         }
     }

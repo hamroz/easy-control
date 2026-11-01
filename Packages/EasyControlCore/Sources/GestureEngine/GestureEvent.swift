@@ -23,10 +23,25 @@ public enum Phase: String, Codable, Sendable {
     case cancelled
 }
 
+public enum MouseButton: Sendable, Equatable {
+    case left, right
+}
+
+public enum ButtonAction: Sendable, Equatable {
+    case click(count: Int)
+    case down, up
+}
+
 public enum GestureEvent: Equatable, Sendable {
     case discrete(GestureID)
-    /// `delta` is palm displacement in normalized image units (mirrored, +y down) since the previous event.
+    /// `delta` is hand displacement in isotropic frame heights (mirrored, +y down) since the previous event.
     case continuous(GestureID, phase: Phase, delta: SIMD2<Float>)
-    case cursor(position: SIMD2<Float>)
+    /// Where the hand's pointer anchor (index knuckle) is, in isotropic frame heights, at camera time `at`.
+    case pointerTrack(position: SIMD2<Float>, at: Double)
+    /// The pointer stops following the hand (press, hand lost): output must not extrapolate further.
+    case pointerLift
+    /// A mouse button action. Clicks and presses happen where the pointer was at `anchorTime`, before the
+    /// closing fingers dragged it.
+    case button(MouseButton, ButtonAction, anchorTime: Double)
     case engagement(EngagementState)
 }

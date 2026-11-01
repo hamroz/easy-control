@@ -31,14 +31,17 @@ public struct HandObservation: Sendable {
 
 /// Decides when gestures count.
 ///
-/// - idle → engaged: open palm held `wakeHold`, or two/three fingers held `directEngageHold` (hand close enough).
+/// - idle → engaged: open palm held `wakeHold`, or three fingers held `directEngageHold` (hand close enough).
 /// - engaged → standby: the hand is gone for `handLostTimeout` or quiet for `idleTimeout`.
 /// - standby → engaged: a hand that is new, or that genuinely changed pose (to another gesture, or relaxed for
 ///   `resumeRelax`), holds a gesture pose for `resumeHold` — never while typing. Unreliable frames don't count
 ///   as changes, so a still palm with tracking noise can't flap between states. standby → idle after
 ///   `standbyDuration`.
 public struct EngagementController {
-    private static let gesturePoses: Set<PoseClass> = [.openPalm, .two, .three]
+    /// Poses that wake the engine from idle (open palm, or three fingers held briefly).
+    private static let wakePoses: Set<PoseClass> = [.openPalm, .three]
+    /// Poses that resume from standby: a raised hand, ready to point or pinch.
+    private static let gesturePoses: Set<PoseClass> = [.openPalm, .three, .ok, .pinch]
 
     private let config: GestureConfig
     public private(set) var state: EngagementState = .idle
@@ -82,7 +85,7 @@ public struct EngagementController {
                 return nil
             }
             for (id, hand) in present {
-                guard Self.gesturePoses.contains(hand.pose), hand.palmSize >= config.minPalmSize, !spent.contains(id) else {
+                guard Self.wakePoses.contains(hand.pose), hand.palmSize >= config.minPalmSize, !spent.contains(id) else {
                     holdStart[id] = nil
                     continue
                 }

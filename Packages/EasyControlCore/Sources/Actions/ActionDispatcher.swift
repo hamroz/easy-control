@@ -35,7 +35,7 @@ public final class ActionDispatcher {
                 case .dockSwipe: dock.handle(id, phase: phase, delta: delta, at: t)
                 default: break
                 }
-            case .cursor, .engagement:
+            case .pointerTrack, .pointerLift, .button, .engagement:
                 break
             }
         }
