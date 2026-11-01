@@ -63,6 +63,18 @@ public final class CameraCapture: NSObject, @unchecked Sendable {
         return ranges.flatMap { [$0.lowerBound, $0.upperBound] }.min { abs($0 - fps) < abs($1 - fps) }
     }
 
+    /// Index of the format to use: exactly `target` at ≥ 30 fps, else the smallest ≥ 640×480 at ≥ 30 fps.
+    /// Vision's cost grows with frame size, and 720p is plenty for hands.
+    static func chooseFormat(_ formats: [(width: Int32, height: Int32, maxFPS: Double)],
+                             target: (Int32, Int32) = (1280, 720)) -> Int? {
+        let usable = formats.enumerated().filter { $0.element.maxFPS >= 30 }
+        if let exact = usable.first(where: { $0.element.width == target.0 && $0.element.height == target.1 }) {
+            return exact.offset
+        }
+        return usable.filter { $0.element.width >= 640 && $0.element.height >= 480 }
+            .min { $0.element.width * $0.element.height < $1.element.width * $1.element.height }?.offset
+    }
+
     private func configure() throws {
         guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .unspecified)
             ?? AVCaptureDevice.default(for: .video) else {
@@ -72,7 +84,6 @@ public final class CameraCapture: NSObject, @unchecked Sendable {
         device = camera
         session.beginConfiguration()
         defer { session.commitConfiguration() }
-        if session.canSetSessionPreset(.vga640x480) { session.sessionPreset = .vga640x480 }
         let input = try AVCaptureDeviceInput(device: camera)
         guard session.canAddInput(input) else { throw CaptureError.cannotAddInput }
         session.addInput(input)
@@ -82,8 +93,19 @@ public final class CameraCapture: NSObject, @unchecked Sendable {
         output.setSampleBufferDelegate(self, queue: queue)
         guard session.canAddOutput(output) else { throw CaptureError.cannotAddOutput }
         session.addOutput(output)
+        selectFormat(camera)
         setFrameRate(30)
         observe()
+    }
+
+    private func selectFormat(_ camera: AVCaptureDevice) {
+        let candidates = camera.formats.map { f -> (width: Int32, height: Int32, maxFPS: Double) in
+            let d = CMVideoFormatDescriptionGetDimensions(f.formatDescription)
+            return (d.width, d.height, f.videoSupportedFrameRateRanges.map(\.maxFrameRate).max() ?? 0)
+        }
+        guard let index = Self.chooseFormat(candidates), (try? camera.lockForConfiguration()) != nil else { return }
+        camera.activeFormat = camera.formats[index]
+        camera.unlockForConfiguration()
     }
 
     private func observe() {

@@ -62,3 +62,18 @@ func detectsHandInSampleImage() throws {
     #expect(CameraCapture.chooseFrameRate(60, ranges: [1...30]) == 30)
     #expect(CameraCapture.chooseFrameRate(10, ranges: []) == nil)
 }
+
+@Test func formatPrefers720p() {
+    let formats: [(width: Int32, height: Int32, maxFPS: Double)] = [(1920, 1080, 30), (1280, 720, 30), (640, 480, 30)]
+    #expect(CameraCapture.chooseFormat(formats) == 1)
+}
+
+@Test func formatFallsBackToSmallest30fps() {
+    let formats: [(width: Int32, height: Int32, maxFPS: Double)] = [(1920, 1080, 30), (1760, 1328, 30), (320, 240, 30), (960, 540, 30)]
+    #expect(CameraCapture.chooseFormat(formats) == 3)
+}
+
+@Test func formatNilWhenNothing30fps() {
+    let formats: [(width: Int32, height: Int32, maxFPS: Double)] = [(1280, 720, 15)]
+    #expect(CameraCapture.chooseFormat(formats) == nil)
+}
