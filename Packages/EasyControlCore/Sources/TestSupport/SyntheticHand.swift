@@ -3,6 +3,10 @@ import HandTracking
 
 public enum SyntheticPose: Sendable {
     case openPalm, fist, point, two, three
+    /// Thumb tip on the curled index tip (other fingers extended); `pinchOpenness` 0…1 opens it.
+    case pinch
+    /// Thumb tip on the curled middle tip.
+    case pinchMiddle
 
     /// Which fingers (thumb...little) are extended.
     var extended: [Bool] {
@@ -12,6 +16,7 @@ public enum SyntheticPose: Sendable {
         case .point: [false, true, false, false, false]
         case .two: [false, true, true, false, false]
         case .three: [false, true, true, true, false]
+        case .pinch, .pinchMiddle: [true, true, true, true, true]
         }
     }
 }
@@ -23,7 +28,8 @@ public enum SyntheticHand {
         center: SIMD2<Float> = [0.5, 0.5],
         palmSize: Float = 0.12,
         chirality: Chirality = .right,
-        confidence: Float = 1
+        confidence: Float = 1,
+        pinchOpenness: Float = 0
     ) -> Hand {
         // Build a right hand around the origin (palm centre), then mirror for left and translate.
         let s = palmSize
@@ -58,6 +64,19 @@ public enum SyntheticHand {
             points[thumb[1].rawValue] = cmc + [0.1 * s, -0.25 * s]
             points[thumb[2].rawValue] = cmc + [0.25 * s, -0.4 * s]
             points[thumb[3].rawValue] = cmc + [0.4 * s, -0.45 * s]
+        }
+
+        // Pinch: curl the pinching finger and bring the thumb tip to its tip (openness 0) or away (1).
+        if pose == .pinch || pose == .pinchMiddle {
+            let finger = JointName.fingers[pose == .pinch ? 1 : 2]
+            let mcp = points[finger[0].rawValue]
+            points[finger[1].rawValue] = mcp + [0, -0.35 * s]
+            points[finger[2].rawValue] = mcp + [0.1 * s, -0.55 * s]
+            points[finger[3].rawValue] = mcp + [0.2 * s, -0.5 * s]
+            let target = points[finger[3].rawValue]
+            let openTip = cmc + SIMD2<Float>(-0.7071, -0.7071) * (0.9 * s)
+            let tip = target + (openTip - target) * min(max(pinchOpenness, 0), 1)
+            for k in 1...3 { points[thumb[k].rawValue] = cmc + (tip - cmc) * (Float(k) / 3) }
         }
 
         let mirror: Float = chirality == .left ? -1 : 1
