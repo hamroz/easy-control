@@ -1,7 +1,7 @@
 #!/bin/zsh
 # Generates the Xcode project and builds build/EasyControl.app.
 # Signs with an "Apple Development" identity when one exists (so Camera/Accessibility grants survive
-# rebuilds), otherwise ad-hoc. Usage: scripts/build-app.sh [Debug|Release]
+# rebuilds), otherwise ad-hoc (EC_ADHOC=1 forces ad-hoc, used for release builds). Usage: scripts/build-app.sh [Debug|Release]
 set -euo pipefail
 cd "$(dirname "$0")/.."
 CONFIG=${1:-Debug}
@@ -9,7 +9,8 @@ CONFIG=${1:-Debug}
 xcodegen generate --quiet
 mkdir -p build
 
-IDENTITY=$(security find-identity -v -p codesigning | awk -F'"' '/Apple Development/ {print $2; exit}')
+IDENTITY=""
+[[ -z "${EC_ADHOC:-}" ]] && IDENTITY=$(security find-identity -v -p codesigning | awk -F'"' '/Apple Development/ {print $2; exit}')
 SIGN_ARGS=(CODE_SIGN_IDENTITY=-)
 if [[ -n "$IDENTITY" ]]; then
   TEAM=$(security find-certificate -c "$IDENTITY" -p | openssl x509 -noout -subject | sed -n 's/.*OU *= *\([A-Z0-9]*\).*/\1/p')
