@@ -35,3 +35,17 @@ import Testing
     p.update([0.2, 0], at: 1.0) // long gap: no velocity carried over
     #expect(p.sample(at: 1.02) == [0.2, 0])
 }
+
+@Test func deadbandIgnoresTremor() {
+    var d = Deadband(radius: 0.004)
+    #expect(d.filter([0.502, 0.5]) == [0.502, 0.5])
+    #expect(d.filter([0.498, 0.5]) == [0.502, 0.5]) // 0.004 away: still inside
+    #expect(d.filter([0.5015, 0.501]) == [0.502, 0.5])
+}
+
+@Test func deadbandFollowsRealMotionWithSlack() {
+    var d = Deadband(radius: 0.004)
+    _ = d.filter([0.5, 0.5])
+    let out = d.filter([0.52, 0.5])
+    #expect(abs(out.x - 0.516) < 1e-5 && out.y == 0.5) // dragged along, `radius` behind
+}

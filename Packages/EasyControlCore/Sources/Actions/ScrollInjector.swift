@@ -12,6 +12,8 @@ public final class ScrollInjector {
     private static let tickInterval: Float = 1.0 / 60
 
     private var recent: [(t: Double, delta: SIMD2<Float>)] = []
+    /// Fractions of a pixel not yet posted: small per-frame deltas would otherwise round away.
+    private var carry: SIMD2<Float> = .zero
     private var momentumVelocity: SIMD2<Float>?
     private var momentumStarted = false
 
@@ -32,12 +34,17 @@ public final class ScrollInjector {
         case .began:
             stopMomentum()
             recent.removeAll()
+            carry = .zero
             sink.post(.scroll(dx: 0, dy: 0, phase: .began, momentum: .none))
         case .changed:
             let px = pixels(delta)
             recent.append((t, px))
             recent.removeAll { t - $0.t > Self.velocityWindow }
-            sink.post(.scroll(dx: Int32(px.x.rounded()), dy: Int32(px.y.rounded()), phase: .changed, momentum: .none))
+            let total = px + carry
+            let whole = SIMD2<Float>(total.x.rounded(), total.y.rounded())
+            carry = total - whole
+            guard whole != .zero else { return }
+            sink.post(.scroll(dx: Int32(whole.x), dy: Int32(whole.y), phase: .changed, momentum: .none))
         case .cancelled:
             recent.removeAll()
             stopMomentum()

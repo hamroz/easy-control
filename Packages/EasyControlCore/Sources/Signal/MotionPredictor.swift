@@ -35,3 +35,31 @@ public struct MotionPredictor: Sendable {
         velocity = .zero
     }
 }
+
+/// A "sticky" point: movement within `radius` of the resting point is ignored (hand tremor); beyond it, the
+/// resting point is dragged along, staying `radius` behind.
+public struct Deadband: Sendable {
+    private let radius: Float
+    private var rest: SIMD2<Float>?
+
+    public init(radius: Float = 0.004) {
+        self.radius = radius
+    }
+
+    public mutating func filter(_ p: SIMD2<Float>) -> SIMD2<Float> {
+        guard let r = rest else {
+            rest = p
+            return p
+        }
+        let d = p - r
+        let distance = (d * d).sum().squareRoot()
+        guard distance > radius else { return r }
+        let moved = p - d / distance * radius
+        rest = moved
+        return moved
+    }
+
+    public mutating func reset() {
+        rest = nil
+    }
+}

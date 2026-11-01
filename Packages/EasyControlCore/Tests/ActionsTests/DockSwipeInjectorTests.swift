@@ -74,9 +74,9 @@ private func injector(supported: Bool = true) -> (DockSwipeInjector, RecordingEv
 
 @Test func pauseCancelsOpenDockSwipe() {
     let sink = RecordingEventSink(supportsDockSwipe: true)
-    let dispatcher = ActionDispatcher(sink: sink, spaces: ControlArrowStrategy(sink: sink), scroll: ScrollInjector(sink: sink))
-    dispatcher.handle([.continuous(.dockSwipeHorizontal, phase: .began, delta: [0.05, 0])], at: 0)
-    dispatcher.cancelMomentum()
+    let loop = OutputLoop(sink: sink, environment: FakeEnvironment(), spaces: ControlArrowStrategy(sink: sink))
+    loop.receive([.continuous(.dockSwipeHorizontal, phase: .began, delta: [0.05, 0])], at: 0)
+    loop.cancelAll(at: 0.1)
     #expect(sink.events.compactMap(dock).last?.1 == .cancelled)
 }
 

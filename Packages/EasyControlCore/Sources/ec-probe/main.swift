@@ -34,8 +34,9 @@ case "space":
 
 case "mission-control", "app-expose":
     let before = dockWindowCount()
-    let dispatcher = ActionDispatcher(sink: sink, spaces: ControlArrowStrategy(sink: sink), scroll: ScrollInjector(sink: sink))
-    dispatcher.handle([.discrete(args[0] == "mission-control" ? .swipeUp : .swipeDown)], at: CACurrentMediaTime())
+    let key = args[0] == "mission-control" ? KeyCode.upArrow : KeyCode.downArrow
+    sink.post(.key(code: key, flags: KeyFlags.controlArrow, down: true))
+    sink.post(.key(code: key, flags: KeyFlags.controlArrow, down: false))
     Thread.sleep(forTimeInterval: 1.0)
     print("posted; on-screen Dock windows before \(before), after \(dockWindowCount())")
 
