@@ -14,6 +14,10 @@ public enum DockPhase: UInt32, Sendable {
     case began = 1, changed = 2, ended = 4, cancelled = 8
 }
 
+public enum MouseKind: Sendable {
+    case moved, leftDown, leftUp, leftDragged, rightDown, rightUp
+}
+
 /// Input we inject into macOS, independent of CoreGraphics so it can be recorded in tests.
 public enum SyntheticEvent: Equatable, Sendable {
     /// Pixel deltas; positive `dy` scrolls the view up (content moves down), as a scroll wheel does.
@@ -22,4 +26,6 @@ public enum SyntheticEvent: Equatable, Sendable {
     /// The Dock's three-finger swipe. `progress` 1.0 ≈ one Space (horizontal) or a full Mission Control
     /// transition (vertical); positive = natural direction. `velocity` is sent with ended/cancelled.
     case dockSwipe(motion: DockMotion, phase: DockPhase, progress: Double, velocity: Double)
+    /// Global display coordinates (origin top-left of the main display, y down).
+    case mouse(MouseKind, x: Double, y: Double, clickCount: Int)
 }

@@ -36,6 +36,19 @@ public struct CGEventSink: EventSink {
             return e
         case .dockSwipe:
             return nil
+        case let .mouse(kind, x, y, clickCount):
+            let (type, button): (CGEventType, CGMouseButton) = switch kind {
+            case .moved: (.mouseMoved, .left)
+            case .leftDown: (.leftMouseDown, .left)
+            case .leftUp: (.leftMouseUp, .left)
+            case .leftDragged: (.leftMouseDragged, .left)
+            case .rightDown: (.rightMouseDown, .right)
+            case .rightUp: (.rightMouseUp, .right)
+            }
+            guard let e = CGEvent(mouseEventSource: source, mouseType: type, mouseCursorPosition: CGPoint(x: x, y: y),
+                                  mouseButton: button) else { return nil }
+            e.setIntegerValueField(.mouseEventClickState, value: Int64(clickCount))
+            return e
         }
     }
 }
